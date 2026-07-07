@@ -50,7 +50,9 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     maxSavedHands: 25,
     dailyImportLimit: 5,
     bulkImportAllowed: false,
-    leakFinderEnabled: false,
+    // Leak finder / personal-coach dashboard (DNA, IQ, skill tree, missions, roadmap) is a core
+    // free-tier pillar of the "personal coach" positioning, not a Pro differentiator.
+    leakFinderEnabled: true,
     rangeVsRangeEnabled: false,
     icmEnabled: false,
     dailyAiReviewLimit: 1,

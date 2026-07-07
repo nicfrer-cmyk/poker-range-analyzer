@@ -31,6 +31,7 @@
     "@prisma/client": "^5.18.0",
     "prisma": "^5.18.0",
     "stripe": "^16.6.0",
+    "@anthropic-ai/sdk": "^0.110.0",
     "recharts": "^2.12.7",
     "clsx": "^2.1.1"
   },

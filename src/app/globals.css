@@ -2,18 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-base-bg: 255 255 255;
+  --color-base-panel: 248 249 251;
+  --color-base-panel2: 238 240 244;
+  --color-base-border: 226 229 235;
+  --color-base-text: 22 26 32;
+  --color-base-muted: 105 112 128;
+
+  --color-status-crushing: 11 122 62;
+  --color-status-ahead: 31 168 88;
+  --color-status-close: 201 154 18;
+  --color-status-risky: 224 123 34;
+  --color-status-behind: 220 61 69;
+
+  --color-accent: 91 91 224;
+  --color-accent-soft: 70 70 198;
+
+  --bg-radial-tint: 91, 91, 224;
+}
+
+:root[data-theme="dark"] {
+  --color-base-bg: 13 15 19;
+  --color-base-panel: 22 25 31;
+  --color-base-panel2: 29 33 40;
+  --color-base-border: 44 49 58;
+  --color-base-text: 232 234 237;
+  --color-base-muted: 150 158 170;
+
+  --color-status-crushing: 25 150 85;
+  --color-status-ahead: 47 190 107;
+  --color-status-close: 232 197 71;
+  --color-status-risky: 240 145 59;
+  --color-status-behind: 229 72 77;
+
+  --color-accent: 138 138 244;
+  --color-accent-soft: 168 168 248;
+
+  --bg-radial-tint: 138, 138, 244;
+}
+
 @layer base {
   html {
     color-scheme: light;
+  }
+  html[data-theme="dark"] {
+    color-scheme: dark;
   }
   body {
     @apply bg-base-bg text-base-text antialiased;
     background-image: radial-gradient(
       ellipse 80% 60% at 50% -10%,
-      rgba(91, 91, 224, 0.06),
+      rgba(var(--bg-radial-tint), 0.08),
       transparent 60%
     );
     background-attachment: fixed;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
   ::selection {
     @apply bg-accent/20;

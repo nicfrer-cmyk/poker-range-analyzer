@@ -5,19 +5,23 @@ import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel
 import type { ComboBucket } from "@/lib/analysisTypes";
 import { MADE_TIER_LABEL } from "@/lib/labels";
 import type { MadeTier } from "@/lib/engine/classify";
+import { useTheme } from "@/lib/useTheme";
 
-const COLORS = [
-  "#1FA858",
-  "#5B5BE0",
-  "#C99A12",
-  "#E07B22",
-  "#DC3D45",
-  "#8F8FF7",
-  "#0B7A3E",
-  "#697080",
-];
+// Mirrors globals.css CSS variables per theme — recharts fills need plain rgb() strings,
+// Tailwind classes don't apply to SVG fill/stroke attributes.
+const COLORS_BY_THEME: Record<"light" | "dark", string[]> = {
+  light: ["rgb(31 168 88)", "rgb(91 91 224)", "rgb(201 154 18)", "rgb(224 123 34)", "rgb(220 61 69)", "rgb(143 143 247)", "rgb(11 122 62)", "rgb(105 112 128)"],
+  dark: ["rgb(47 190 107)", "rgb(138 138 244)", "rgb(232 197 71)", "rgb(240 145 59)", "rgb(229 72 77)", "rgb(168 168 248)", "rgb(25 150 85)", "rgb(150 158 170)"],
+};
+const TOOLTIP_BG: Record<"light" | "dark", { bg: string; border: string }> = {
+  light: { bg: "rgb(255 255 255)", border: "rgb(226 229 235)" },
+  dark: { bg: "rgb(13 15 19)", border: "rgb(44 49 58)" },
+};
 
 export function RangePieChart({ buckets }: { buckets: ComboBucket[] }) {
+  const [theme] = useTheme();
+  const colors = COLORS_BY_THEME[theme];
+  const tooltipColors = TOOLTIP_BG[theme];
   const data = buckets
     .filter((b) => b.weight > 0)
     .map((b) => ({
@@ -45,14 +49,14 @@ export function RangePieChart({ buckets }: { buckets: ComboBucket[] }) {
                 paddingAngle={2}
               >
                 {data.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="none" />
+                  <Cell key={i} fill={colors[i % colors.length]} stroke="none" />
                 ))}
               </Pie>
               <Tooltip
                 formatter={(value: number, name: string) => [`${value}%`, name]}
                 contentStyle={{
-                  background: "#FFFFFF",
-                  border: "1px solid #E2E5EB",
+                  background: tooltipColors.bg,
+                  border: `1px solid ${tooltipColors.border}`,
                   borderRadius: 8,
                   fontSize: 12,
                 }}

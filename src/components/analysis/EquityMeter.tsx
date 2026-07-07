@@ -3,19 +3,23 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { equityTone } from "@/components/ui/Badge";
+import { useTheme } from "@/lib/useTheme";
 
-const TONE_HEX: Record<string, string> = {
-  crushing: "#0B7A3E",
-  ahead: "#1FA858",
-  close: "#C99A12",
-  risky: "#E07B22",
-  behind: "#DC3D45",
+// Mirrors the --color-status-* CSS variables in globals.css for each theme, since these need
+// to be plain rgb() strings usable in inline SVG stroke/filter attributes (Tailwind classes
+// don't apply there).
+const TONE_RGB: Record<"light" | "dark", Record<string, string>> = {
+  light: { crushing: "11 122 62", ahead: "31 168 88", close: "201 154 18", risky: "224 123 34", behind: "220 61 69" },
+  dark: { crushing: "25 150 85", ahead: "47 190 107", close: "232 197 71", risky: "240 145 59", behind: "229 72 77" },
 };
 
 export function EquityMeter({ equityPct }: { equityPct: number }) {
   const [display, setDisplay] = useState(0);
+  const [theme] = useTheme();
   const tone = equityTone(equityPct);
-  const color = TONE_HEX[tone];
+  const rgb = TONE_RGB[theme][tone];
+  const color = `rgb(${rgb})`;
+  const glowColor = `rgba(${rgb!.replace(/ /g, ", ")}, 0.4)`;
 
   useEffect(() => {
     let raf: number;
@@ -58,7 +62,7 @@ export function EquityMeter({ equityPct }: { equityPct: number }) {
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          style={{ filter: `drop-shadow(0 0 8px ${color}66)` }}
+          style={{ filter: `drop-shadow(0 0 8px ${glowColor})` }}
         />
       </svg>
       <div className="absolute flex flex-col items-center">

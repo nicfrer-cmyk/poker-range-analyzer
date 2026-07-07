@@ -12,6 +12,7 @@ export function getTodayCount(metric: string): number {
 
 export function incrementToday(metric: string): number {
   const next = getTodayCount(metric) + 1;
+  if (typeof window === "undefined") return next;
   window.localStorage.setItem(todayKey(metric), String(next));
   return next;
 }

@@ -117,43 +117,43 @@ export default async function BillingPage({
   const { email, subscription, configError } = await getCurrentUserAndSubscription();
 
   const checkoutError =
-    searchParams.checkout === "error" ? searchParams.message ?? "Checkout failed." : null;
+    searchParams.checkout === "error" ? searchParams.message ?? "התשלום נכשל." : null;
   const checkoutCancelled = searchParams.checkout === "cancelled";
   const checkoutSuccess = searchParams.checkout === "success";
 
   return (
     <div className="mx-auto max-w-4xl p-6">
       <h1 className="mb-2 text-2xl font-semibold">מנוי וחיוב</h1>
-      <p className="mb-6 text-sm opacity-75">
+      <p className="mb-6 text-sm text-base-muted">
         מנתח טווחי פוקר — תוכנית חינמית מול פרו.
       </p>
 
       {configError && (
-        <div className="mb-6 rounded-2xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm">
+        <div className="mb-6 rounded-2xl border border-status-close/40 bg-status-close/10 p-4 text-sm text-base-text">
           Supabase עדיין לא מוגדר, ולכן לא ניתן להציג את החשבון שלך או לבצע
           תשלום. ({configError})
         </div>
       )}
 
       {checkoutError && (
-        <div className="mb-6 rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm">
+        <div className="mb-6 rounded-2xl border border-status-behind/40 bg-status-behind/10 p-4 text-sm text-base-text">
           {checkoutError}
         </div>
       )}
       {checkoutCancelled && (
-        <div className="mb-6 rounded-2xl border border-white/20 bg-white/5 p-4 text-sm">
+        <div className="mb-6 rounded-2xl border border-base-border bg-base-panel2 p-4 text-sm text-base-text">
           התשלום בוטל — לא בוצע שום שינוי.
         </div>
       )}
       {checkoutSuccess && (
-        <div className="mb-6 rounded-2xl border border-green-500/40 bg-green-500/10 p-4 text-sm">
+        <div className="mb-6 rounded-2xl border border-status-crushing/40 bg-status-crushing/10 p-4 text-sm text-base-text">
           תודה! המנוי שלך בתהליך הקמה — הדף הזה יציג גישת פרו ברגע ש-Stripe
           יאשר את התשלום.
         </div>
       )}
 
       {subscription && (
-        <div className="mb-8 rounded-2xl border border-white/20 p-4 text-sm">
+        <div className="mb-8 rounded-2xl border border-base-border bg-base-panel p-4 text-sm text-base-text">
           מחובר בתור <span className="font-medium">{email}</span> — תוכנית
           נוכחית: <span className="font-medium">{subscription.plan}</span> (
           {subscription.status}
@@ -166,45 +166,44 @@ export default async function BillingPage({
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Free plan */}
-        <div className="rounded-2xl border border-white/20 p-6">
+        <div className="rounded-2xl border border-base-border bg-base-panel p-6">
           <h2 className="text-lg font-semibold">חינמי</h2>
           <p className="mt-1 text-3xl font-bold">$0</p>
-          <ul className="mt-4 space-y-2 text-sm opacity-90">
+          <ul className="mt-4 space-y-2 text-sm text-base-text/90">
             <li>{PLAN_LIMITS.FREE.dailyAnalysisLimit} ניתוחי ידיים ביום</li>
             <li>עד {PLAN_LIMITS.FREE.maxSavedHands} ניתוחים שמורים</li>
             <li>טווחים מוגדרים מראש + בנייה ידנית בסיסית של טווחים</li>
             <li>סיכום יד + מאמן</li>
             <li>חישובי פוט אודס / SPR / EV</li>
             <li>{PLAN_LIMITS.FREE.dailyImportLimit} ייבואי היסטוריית יד ביום (ללא ייבוא מרובה)</li>
-            <li className="opacity-60">גילוי דליפות וסקירת סשן — לא כלול</li>
+            <li>מאמן אישי: גילוי דליפות, DNA, IQ, עץ מיומנויות, משימות יומיות</li>
             <li>מצב אימון בסיסי</li>
-            <li className="opacity-60">טווח מול טווח — לא כלול</li>
-            <li className="opacity-60">מחשבון ICM — לא כלול</li>
+            <li className="text-base-muted">טווח מול טווח — לא כלול</li>
+            <li className="text-base-muted">מחשבון ICM — לא כלול</li>
             <li>{PLAN_LIMITS.FREE.dailyAiReviewLimit} ניתוחי AI ליד ביום</li>
             <li>עד {PLAN_LIMITS.FREE.maxOpponentProfiles} פרופילי יריבים</li>
-            <li className="opacity-60">ייצוא נתונים — לא כלול</li>
+            <li className="text-base-muted">ייצוא נתונים — לא כלול</li>
             <li>תמיכה רגילה</li>
           </ul>
         </div>
 
         {/* Pro plan */}
-        <div className="rounded-2xl border border-white/40 p-6">
+        <div className="rounded-2xl border border-accent/40 bg-base-panel p-6">
           <h2 className="text-lg font-semibold">פרו</h2>
           <p className="mt-1 text-3xl font-bold">
             ${PRO_PRICING.monthly.amountUsd}
-            <span className="text-base font-normal opacity-70">/לחודש</span>
+            <span className="text-base font-normal text-base-muted">/לחודש</span>
           </p>
-          <p className="text-xs opacity-60">
+          <p className="text-xs text-base-muted">
             או ${PRO_PRICING.annual.amountUsd}/לשנה (הנחה של{" "}
             {PRO_PRICING.annual.discountPercentVsMonthly}%) — מחיר זמני, בהמתנה
             למחקר שוק
           </p>
-          <ul className="mt-4 space-y-2 text-sm opacity-90">
+          <ul className="mt-4 space-y-2 text-sm text-base-text/90">
             <li>ניתוחי ידיים ללא הגבלה</li>
             <li>ניתוחים שמורים ללא הגבלה</li>
             <li>בניית טווחים מתקדמת עם שמירה ללא הגבלה</li>
             <li>ייבוא היסטוריית יד ללא הגבלה, כולל ייבוא מרובה</li>
-            <li>גילוי דליפות וסקירת סשן מלאים</li>
             <li>מצב אימון מלא ומסלולי לימוד</li>
             <li>ניתוח טווח מול טווח</li>
             <li>מחשבון ICM</li>
@@ -215,7 +214,7 @@ export default async function BillingPage({
           </ul>
 
           {subscription?.plan === "PRO" ? (
-            <div className="mt-6 rounded-xl border border-green-500/40 bg-green-500/10 p-3 text-center text-sm">
+            <div className="mt-6 rounded-xl border border-status-crushing/40 bg-status-crushing/10 p-3 text-center text-sm text-base-text">
               יש לך מנוי פרו פעיל
             </div>
           ) : (
@@ -224,7 +223,7 @@ export default async function BillingPage({
                 <button
                   type="submit"
                   disabled={Boolean(configError)}
-                  className="w-full rounded-xl border border-white/40 p-3 text-sm font-medium hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-xl border border-accent/40 p-3 text-sm font-medium text-base-text hover:bg-base-panel2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   שדרוג לפרו — חודשי (${PRO_PRICING.monthly.amountUsd}/לחודש)
                 </button>
@@ -233,7 +232,7 @@ export default async function BillingPage({
                 <button
                   type="submit"
                   disabled={Boolean(configError)}
-                  className="w-full rounded-xl border border-white/40 p-3 text-sm font-medium hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-xl border border-accent/40 p-3 text-sm font-medium text-base-text hover:bg-base-panel2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   שדרוג לפרו — שנתי (${PRO_PRICING.annual.amountUsd}/לשנה)
                 </button>

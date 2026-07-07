@@ -40,6 +40,18 @@ const paths: Record<NavItem["icon"], React.ReactNode> = {
       <path d="M12 2.5v2.4M12 19.1v2.4M4.2 6.3l1.8 1.6M18 16.1l1.8 1.6M2.5 12h2.4M19.1 12h2.4M4.2 17.7l1.8-1.6M18 7.9l1.8-1.6" />
     </>
   ),
+  dna: (
+    <path d="M4 4c6 5 10 5 16 0M4 20c6-5 10-5 16 0M8 3.5c1.5 2.5 1.5 15 8 17M16 3.5c-1.5 2.5-1.5 15-8 17" />
+  ),
+  brain: (
+    <path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5h1.5M15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5h-1.5M9 4v15M15 4v15M9 9c1.5 1 3 1 4.5 0M9 14c1.5 1 3 1 4.5 0" />
+  ),
+  checklist: (
+    <>
+      <rect x="4" y="4" width="16" height="16" rx="2.5" />
+      <path d="M7.5 9 9 10.5 12 7.5M7.5 15 9 16.5 12 13.5" />
+    </>
+  ),
 };
 
 export function NavIcon({ icon, className }: { icon: NavItem["icon"]; className?: string }) {

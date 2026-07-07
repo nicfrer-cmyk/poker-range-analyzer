@@ -1,6 +1,6 @@
-// Generates minimal flat-color PNG app icons (no image deps required) so the
-// PWA manifest has real icon files. Replace these with real branded artwork
-// later — see ROADMAP.md.
+// Generates flat-color PNG app icons (no image deps required) so the PWA
+// manifest has real icon files: a pair of fanned aces (black spade + red
+// heart) on the brand-purple background, evoking "pocket aces".
 import { deflateSync } from "zlib";
 import { writeFileSync, mkdirSync } from "fs";
 
@@ -29,7 +29,111 @@ function chunk(type, data) {
   return Buffer.concat([len, typeBuf, data, crcBuf]);
 }
 
-function makePng(size, [r, g, b], accentHex) {
+// Signed distance to a rounded box, centered at origin, in local (unrotated) space.
+function sdRoundBox(px, py, halfW, halfH, r) {
+  const qx = Math.abs(px) - halfW + r;
+  const qy = Math.abs(py) - halfH + r;
+  const ax = Math.max(qx, 0);
+  const ay = Math.max(qy, 0);
+  return Math.min(Math.max(qx, qy), 0) + Math.sqrt(ax * ax + ay * ay) - r;
+}
+
+// Classic implicit heart curve, y-up, point at bottom, lobes at top.
+function insideHeart(x, y) {
+  const a = x * x + y * y - 1;
+  return a * a * a - x * x * y * y * y <= 0;
+}
+
+// Spade = heart flipped vertically (point at top, lobes at bottom) + a stem
+// growing out of the natural cleft between the lobes (around y = -1.0).
+function insideSpade(x, y) {
+  if (insideHeart(x, -y)) return true;
+  const stemTop = -0.92;
+  const stemBottom = -1.42;
+  if (y > stemTop || y < stemBottom) return false;
+  const t = (y - stemTop) / (stemBottom - stemTop); // 0 at top, 1 at bottom
+  const halfWidth = 0.26 * (1 - t) + 0.015;
+  return Math.abs(x) <= halfWidth;
+}
+
+// Vertical midpoints of each glyph's bounding box, in the same y-up units as
+// the formulas above, used to center each pip within its card.
+const HEART_CENTER_Y = 0.12;
+const SPADE_CENTER_Y = -0.23;
+
+function rotate(px, py, angle) {
+  const c = Math.cos(-angle);
+  const s = Math.sin(-angle);
+  return [px * c - py * s, px * s + py * c];
+}
+
+function makePng(size) {
+  const bg = [91, 91, 224]; // #5B5BE0 accent purple
+  const cardFace = [250, 250, 252];
+  const cardBorder = [28, 28, 46];
+  const black = [24, 24, 32];
+  const red = [214, 40, 57];
+
+  const cx = size / 2;
+  const cy = size / 2;
+  const cardW = size * 0.36;
+  const cardH = size * 0.5;
+  const r = size * 0.05;
+  const border = Math.max(1.5, size * 0.014);
+
+  const cards = [
+    // Back card: black spade, fanned to the left.
+    {
+      center: [cx - size * 0.155, cy + size * 0.03],
+      angle: (-11 * Math.PI) / 180,
+      pip: "spade",
+      color: black,
+      centerY: SPADE_CENTER_Y,
+    },
+    // Front card: red heart, fanned to the right, drawn on top.
+    {
+      center: [cx + size * 0.155, cy - size * 0.02],
+      angle: (9 * Math.PI) / 180,
+      pip: "heart",
+      color: red,
+      centerY: HEART_CENTER_Y,
+    },
+  ];
+
+  const pixels = new Array(size * size);
+  for (let i = 0; i < pixels.length; i++) pixels[i] = bg;
+
+  for (const card of cards) {
+    const [ccx, ccy] = card.center;
+    const halfW = cardW / 2;
+    const halfH = cardH / 2;
+    const pipScale = cardH * 0.24;
+
+    const minX = Math.max(0, Math.floor(ccx - cardH));
+    const maxX = Math.min(size - 1, Math.ceil(ccx + cardH));
+    const minY = Math.max(0, Math.floor(ccy - cardH));
+    const maxY = Math.min(size - 1, Math.ceil(ccy + cardH));
+
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const [lx, ly] = rotate(x - ccx, y - ccy, card.angle);
+        const sd = sdRoundBox(lx, ly, halfW, halfH, r);
+        if (sd > 0) continue;
+
+        let color = cardFace;
+        if (sd > -border) {
+          color = cardBorder;
+        } else {
+          const nx = lx / pipScale;
+          const ny = card.centerY - ly / pipScale; // flip image-down to y-up, centered on glyph
+          const inPip = card.pip === "heart" ? insideHeart(nx, ny) : insideSpade(nx, ny);
+          if (inPip) color = card.color;
+        }
+        pixels[y * size + x] = color;
+      }
+    }
+  }
+
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(size, 0);
   ihdr.writeUInt32BE(size, 4);
@@ -40,26 +144,15 @@ function makePng(size, [r, g, b], accentHex) {
   ihdr[12] = 0;
 
   const raw = Buffer.alloc(size * (1 + size * 3));
-  const cx = size / 2;
-  const cy = size / 2;
-  const radius = size * 0.32;
   for (let y = 0; y < size; y++) {
     const rowStart = y * (1 + size * 3);
     raw[rowStart] = 0; // filter byte
     for (let x = 0; x < size; x++) {
       const idx = rowStart + 1 + x * 3;
-      const dx = x - cx;
-      const dy = y - cy * 0.95;
-      const inSpade = dx * dx + dy * dy < radius * radius;
-      if (inSpade) {
-        raw[idx] = 255;
-        raw[idx + 1] = 255;
-        raw[idx + 2] = 255;
-      } else {
-        raw[idx] = r;
-        raw[idx + 1] = g;
-        raw[idx + 2] = b;
-      }
+      const [r, g, b] = pixels[y * size + x];
+      raw[idx] = r;
+      raw[idx + 1] = g;
+      raw[idx + 2] = b;
     }
   }
 
@@ -74,8 +167,7 @@ function makePng(size, [r, g, b], accentHex) {
 }
 
 mkdirSync("public/icons", { recursive: true });
-const bg = [91, 91, 224]; // #5B5BE0 accent purple — icons keep a colored mark for home-screen visibility even though the in-app theme is white
 for (const size of [192, 512]) {
-  writeFileSync(`public/icons/icon-${size}.png`, makePng(size, bg));
+  writeFileSync(`public/icons/icon-${size}.png`, makePng(size));
 }
-console.log("Generated placeholder PWA icons in public/icons/");
+console.log("Generated pocket-aces PWA icons in public/icons/");

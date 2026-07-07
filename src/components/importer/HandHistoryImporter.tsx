@@ -6,12 +6,56 @@ import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { PlayingCard } from "@/components/cards/PlayingCard";
+import type { ActionTaken } from "@/lib/engine/leakFinder";
 import { parseBulkHandHistories, type ParsedHand } from "@/lib/engine/handHistoryParser";
 import { parsedHandToBoard, parsedHandToAnalysisInput } from "@/lib/importAdapter";
-import { useAnalysisStore } from "@/lib/store/analysisStore";
+import { useAnalysisStore, type AnalysisInput } from "@/lib/store/analysisStore";
+import { runAnalysis } from "@/lib/analysisEngine";
+import { saveHand } from "@/lib/localHandStore";
+import { createSession } from "@/lib/localSessionStore";
 import { useMockPlan } from "@/lib/useMockPlan";
 import { canPerformAction } from "@/lib/plan";
 import { getTodayCount, incrementToday } from "@/lib/usageTracker";
+
+function defaultSessionName(): string {
+  return `ייבוא מ-${new Date().toLocaleDateString("he-IL")}`;
+}
+
+/** Hero's last recorded action in the hand, mapped to the analyzer's ActionTaken type.
+ *  Falls back to "call" when nothing usable was parsed (e.g. hero folded pre-parse or the
+ *  action verb isn't one the analyzer tracks) — mirrors the "reasonable guess" approach the
+ *  importer already uses for villain range. */
+function heroLastAction(hand: ParsedHand): ActionTaken {
+  const heroActions = hand.actions.filter((a) => a.player === hand.heroName);
+  const last = [...heroActions].reverse().find((a) =>
+    (["fold", "check", "call", "bet", "raise"] as const).includes(a.action as ActionTaken)
+  );
+  return (last?.action as ActionTaken) ?? "call";
+}
+
+/** Builds a best-effort AnalysisInput from a parsed hand so it can be run through the engine
+ *  and saved to the library without the user manually opening each hand in the analyzer. */
+function parsedHandToFullInput(hand: ParsedHand): AnalysisInput {
+  const partial = parsedHandToAnalysisInput(hand);
+  const numPlayers = hand.seats.length || 2;
+  return {
+    gameType: "cash",
+    tableSize: numPlayers,
+    smallBlind: 1,
+    bigBlind: 2,
+    heroPosition: hand.heroPosition ?? "BTN",
+    villainPosition: "BB",
+    heroCards: partial.heroCards ?? [],
+    board: partial.board ?? [],
+    villainRangeText: partial.villainRangeText ?? "22+,A2s+,K7s+,Q9s+,J9s+,T8s+,98s,A7o+,KTo+,QJo",
+    pot: partial.pot ?? 100,
+    toCall: 0,
+    heroStack: 1000,
+    numPlayers,
+    actionTaken: heroLastAction(hand),
+    betSize: 0,
+  };
+}
 
 export function HandHistoryImporter() {
   const router = useRouter();
@@ -20,6 +64,8 @@ export function HandHistoryImporter() {
   const [showScreenshotStub, setShowScreenshotStub] = useState(false);
   const [plan] = useMockPlan();
   const [gateMessage, setGateMessage] = useState<string | null>(null);
+  const [sessionName, setSessionName] = useState(defaultSessionName());
+  const [sessionSavedMessage, setSessionSavedMessage] = useState<string | null>(null);
 
   const handleParse = () => {
     const gate = canPerformAction(plan, "importHand", getTodayCount("import"));
@@ -28,6 +74,7 @@ export function HandHistoryImporter() {
       return;
     }
     setGateMessage(null);
+    setSessionSavedMessage(null);
     incrementToday("import");
     setParsed(parseBulkHandHistories(text));
   };
@@ -42,7 +89,38 @@ export function HandHistoryImporter() {
     const contents = await Promise.all(Array.from(files).map((f) => f.text()));
     const combined = contents.join("\n\n");
     setText((prev) => (prev ? `${prev}\n\n${combined}` : combined));
+    setSessionSavedMessage(null);
     setParsed(parseBulkHandHistories(combined));
+  };
+
+  /** Saves every currently-parsed hand to the local hand library and groups the resulting
+   *  hand IDs into a new session, so a batch import shows up as one session in Session Review
+   *  rather than a pile of unrelated hands. */
+  const saveAllAsSession = () => {
+    const handIds = parsed
+      .map((hand) => {
+        const input = parsedHandToFullInput(hand);
+        const result = runAnalysis(input);
+        if (!result) return null;
+        const stored = saveHand({
+          input,
+          result,
+          action: input.actionTaken,
+          position: hand.heroPosition,
+          source: "imported",
+          streetActions: hand.actions,
+        });
+        return stored.id;
+      })
+      .filter((id): id is string => Boolean(id));
+
+    if (handIds.length === 0) {
+      setSessionSavedMessage("לא נמצאו ידיים תקינות לשמירה (חסרים קלפי הירו).");
+      return;
+    }
+    const name = sessionName.trim() || defaultSessionName();
+    createSession(name, handIds);
+    setSessionSavedMessage(`נשמרו ${handIds.length} ידיים לספרייה תחת הסשן "${name}".`);
   };
 
   const loadIntoAnalyzer = (hand: ParsedHand) => {
@@ -126,6 +204,24 @@ export function HandHistoryImporter() {
           <h3 className="text-sm font-semibold text-base-muted">
             {parsed.length === 1 ? "פוענחה יד אחת" : `פוענחו ${parsed.length} ידיים`}
           </h3>
+
+          <Panel>
+            <PanelBody className="flex flex-wrap items-center gap-3">
+              <input
+                value={sessionName}
+                onChange={(e) => setSessionName(e.target.value)}
+                placeholder="שם הסשן"
+                className="min-w-[200px] flex-1 rounded-lg border border-base-border bg-base-panel2 px-2.5 py-1.5 text-sm outline-none focus:border-accent"
+              />
+              <Button size="sm" onClick={saveAllAsSession}>
+                שמירת כל הידיים לספרייה כסשן חדש
+              </Button>
+              {sessionSavedMessage && (
+                <span className="text-xs text-base-muted">{sessionSavedMessage}</span>
+              )}
+            </PanelBody>
+          </Panel>
+
           {parsed.map((hand, i) => (
             <Panel key={i}>
               <PanelBody className="flex flex-wrap items-center justify-between gap-3">

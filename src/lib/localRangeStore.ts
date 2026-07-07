@@ -44,3 +44,15 @@ export function saveRange(name: string, combos: string): StoredRange {
 export function deleteRange(id: string) {
   writeAll(readAll().filter((r) => r.id !== id));
 }
+
+export function updateRange(id: string, patch: Partial<Pick<StoredRange, "name" | "combos">>) {
+  const ranges = readAll();
+  const idx = ranges.findIndex((r) => r.id === id);
+  if (idx === -1) return;
+  ranges[idx] = { ...ranges[idx]!, ...patch };
+  writeAll(ranges);
+}
+
+export function clearAllRanges() {
+  writeAll([]);
+}

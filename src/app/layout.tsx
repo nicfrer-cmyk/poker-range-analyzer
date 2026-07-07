@@ -27,8 +27,8 @@ export const metadata: Metadata = {
     title: "מנתח טווחי פוקר",
   },
   icons: {
-    icon: "/icons/icon-192.png",
-    apple: "/icons/icon-192.png",
+    icon: "/icons/icon-192.png?v=2",
+    apple: "/icons/icon-192.png?v=2",
   },
 };
 
@@ -46,6 +46,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="he" dir="rtl" className={`${heebo.variable} ${inter.variable}`}>
+      <head>
+        {/* Sets the theme attribute before first paint so switching to dark mode in Settings
+            doesn't flash the light theme on the next page load. Light stays the default. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('pra:theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="min-h-screen font-sans">
         <Providers>{children}</Providers>
         <ServiceWorkerRegister />

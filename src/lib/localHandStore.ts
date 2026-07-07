@@ -1,9 +1,11 @@
 "use client";
 
 import type { SavedHandRecord, ActionTaken } from "@/lib/engine/leakFinder";
+import { isGoodDecision } from "@/lib/engine/leakFinder";
 import type { AnalysisInput } from "@/lib/store/analysisStore";
 import type { AnalysisResult } from "@/lib/analysisTypes";
 import { estimateEvLoss } from "@/lib/analysisEngine";
+import type { ActionEntry } from "@/lib/engine/handHistoryParser";
 
 /**
  * Local-first hand storage. Persists to localStorage so the app is fully usable before a
@@ -17,7 +19,35 @@ export interface StoredHand extends SavedHandRecord {
   potOddsRequired: number;
   tags: string[];
   source: "manual" | "imported";
+  /** Links this hand to an Opponent profile (src/lib/localOpponentStore.ts), if tagged. */
+  opponentId?: string;
+  /** Links this hand to a Session (src/lib/localSessionStore.ts), if imported/saved as one. */
+  sessionId?: string;
+  /** Free-text note the user can attach when reviewing the hand later. */
+  note?: string;
+  /** Full street-by-street action sequence, when known (currently only populated for hands
+   *  imported from a parsed hand history — see handHistoryParser.ts's ParsedHand.actions).
+   *  Manually-entered or older hands simply omit this; the Hand Replay player falls back to
+   *  an equity-only walkthrough when it's missing. */
+  streetActions?: ActionEntry[];
 }
+
+export type MistakeTag = "good" | "mistake" | "review";
+
+/** A meaningful-but-not-huge EV loss reads as "possible mistake"; anything smaller is just
+ *  "worth a second look" rather than a clear error — avoids over-labeling small EV noise. */
+const MISTAKE_EV_THRESHOLD = 0.05;
+
+export function mistakeTagOf(hand: SavedHandRecord): MistakeTag {
+  if (isGoodDecision(hand)) return "good";
+  return hand.evLossEstimate >= MISTAKE_EV_THRESHOLD ? "mistake" : "review";
+}
+
+export const MISTAKE_TAG_LABEL: Record<MistakeTag, string> = {
+  good: "החלטה טובה",
+  mistake: "טעות אפשרית",
+  review: "לבדיקה",
+};
 
 const STORAGE_KEY = "pra:hands:v1";
 
@@ -48,6 +78,15 @@ export function deleteHand(id: string) {
   writeAll(readAll().filter((h) => h.id !== id));
 }
 
+export function updateHand(id: string, patch: Partial<StoredHand>): StoredHand | undefined {
+  const hands = readAll();
+  const idx = hands.findIndex((h) => h.id === id);
+  if (idx === -1) return undefined;
+  hands[idx] = { ...hands[idx]!, ...patch, id: hands[idx]!.id };
+  writeAll(hands);
+  return hands[idx];
+}
+
 export function saveHand({
   input,
   result,
@@ -55,6 +94,8 @@ export function saveHand({
   position,
   tags = [],
   source = "manual",
+  sessionId,
+  streetActions,
 }: {
   input: AnalysisInput;
   result: AnalysisResult;
@@ -62,6 +103,8 @@ export function saveHand({
   position?: string;
   tags?: string[];
   source?: "manual" | "imported";
+  sessionId?: string;
+  streetActions?: ActionEntry[];
 }): StoredHand {
   const hands = readAll();
   const record: StoredHand = {
@@ -81,6 +124,8 @@ export function saveHand({
     handCategory: result.heroCategory,
     tags,
     source,
+    sessionId,
+    streetActions,
   };
   hands.push(record);
   writeAll(hands);
@@ -89,4 +134,42 @@ export function saveHand({
 
 export function clearAllHands() {
   writeAll([]);
+}
+
+export function exportHandsAsJson(hands: StoredHand[] = listHands()): string {
+  return JSON.stringify(hands, null, 2);
+}
+
+export function exportHandsAsCsv(hands: StoredHand[] = listHands()): string {
+  const header = [
+    "תאריך",
+    "קלפי הירו",
+    "בורד",
+    "פוזיציה",
+    "רחוב",
+    "אקוויטי",
+    "פעולה",
+    "תגית",
+  ];
+  const rows = hands.map((h) => [
+    new Date(Number(h.timestamp)).toLocaleDateString("he-IL"),
+    h.heroCards.join(" "),
+    h.board.join(" "),
+    h.position ?? "",
+    h.street,
+    `${(h.equityAtDecision * 100).toFixed(1)}%`,
+    h.actionTaken,
+    MISTAKE_TAG_LABEL[mistakeTagOf(h)],
+  ]);
+  return [header, ...rows].map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+}
+
+export function downloadTextFile(filename: string, content: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }

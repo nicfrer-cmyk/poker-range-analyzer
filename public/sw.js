@@ -1,6 +1,6 @@
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const CACHE_NAME = `pra-shell-${CACHE_VERSION}`;
-const SHELL_ASSETS = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
+const SHELL_ASSETS = ["/", "/manifest.webmanifest", "/icons/icon-192.png?v=2", "/icons/icon-512.png?v=2"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

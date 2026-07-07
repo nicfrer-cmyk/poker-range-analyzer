@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_ITEMS } from "@/lib/nav";
+import { NAV_ITEMS, NAV_SECTION_LABEL } from "@/lib/nav";
 import { NavIcon } from "./NavIcon";
 import { cn } from "@/lib/utils/cn";
 
@@ -16,23 +16,31 @@ export function Sidebar() {
         <span className="font-semibold tracking-tight">מנתח טווחי פוקר</span>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.map((item, i) => {
           const active =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const prevSection = i > 0 ? NAV_ITEMS[i - 1]?.section : undefined;
+          const showSectionLabel = item.section !== prevSection;
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
-                active
-                  ? "bg-accent/10 font-medium text-accent-soft"
-                  : "text-base-muted hover:bg-base-panel2 hover:text-base-text"
+            <div key={item.href}>
+              {showSectionLabel && (
+                <p className="mb-1 mt-4 px-3 text-[11px] font-semibold uppercase tracking-wide text-base-muted/70 first:mt-1">
+                  {NAV_SECTION_LABEL[item.section]}
+                </p>
               )}
-            >
-              <NavIcon icon={item.icon} className="h-4.5 w-4.5 shrink-0" />
-              {item.label}
-            </Link>
+              <Link
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
+                  active
+                    ? "bg-accent/10 font-medium text-accent-soft"
+                    : "text-base-muted hover:bg-base-panel2 hover:text-base-text"
+                )}
+              >
+                <NavIcon icon={item.icon} className="h-4.5 w-4.5 shrink-0" />
+                {item.label}
+              </Link>
+            </div>
           );
         })}
       </nav>
