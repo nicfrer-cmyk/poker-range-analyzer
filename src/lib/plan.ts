@@ -1,0 +1,221 @@
+// ---------------------------------------------------------------------------
+// Plan gating — Free vs Pro limits
+//
+// Single source of truth for what each plan is allowed to do. Keep this in
+// sync with the `Plan` enum in `prisma/schema.prisma` (FREE | PRO) and with
+// the pricing shown on `src/app/billing/page.tsx`.
+//
+// "Unlimited" convention: this file uses the sentinel value `-1` for every
+// unlimited *limit* field (e.g. `dailyAnalysisLimit: -1`), not `Infinity`.
+// Reasons: `-1` survives JSON.stringify/parse and Prisma `Json` columns
+// unchanged, while `Infinity` serializes to `null` and silently breaks
+// comparisons after a round-trip through an API response or the database.
+// Always compare via the `isUnlimited()` / `hasReachedLimit()` helpers below
+// rather than checking `=== -1` inline, so the convention only has to be
+// understood in one place.
+// ---------------------------------------------------------------------------
+
+export type Plan = "FREE" | "PRO";
+
+export interface PlanLimits {
+  /** Hand analyses a user can run per day. -1 = unlimited. */
+  dailyAnalysisLimit: number;
+  /** Total saved hand analyses a user may keep. -1 = unlimited. */
+  maxSavedHands: number;
+  /** Hand history imports per day. -1 = unlimited. */
+  dailyImportLimit: number;
+  /** Whether bulk (multi-file / multi-hand) import is allowed at all. */
+  bulkImportAllowed: boolean;
+  /** Leak finder / session review — Pro-only feature, fully locked on Free. */
+  leakFinderEnabled: boolean;
+  /** Range-vs-range analysis — Pro-only feature. */
+  rangeVsRangeEnabled: boolean;
+  /** ICM calculator — Pro-only feature. */
+  icmEnabled: boolean;
+  /** AI hand reviews per day. -1 = unlimited. */
+  dailyAiReviewLimit: number;
+  /** Opponent profiles a user may save. -1 = unlimited. */
+  maxOpponentProfiles: number;
+  /** Whether exporting saved data (CSV/JSON) is allowed. */
+  dataExportEnabled: boolean;
+  /** Whether training mode includes the full track library, not just basics. */
+  advancedTrainingModeEnabled: boolean;
+  /** Priority support queue vs regular support. */
+  prioritySupport: boolean;
+}
+
+export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
+  FREE: {
+    dailyAnalysisLimit: 10,
+    maxSavedHands: 25,
+    dailyImportLimit: 5,
+    bulkImportAllowed: false,
+    leakFinderEnabled: false,
+    rangeVsRangeEnabled: false,
+    icmEnabled: false,
+    dailyAiReviewLimit: 1,
+    maxOpponentProfiles: 3,
+    dataExportEnabled: false,
+    advancedTrainingModeEnabled: false,
+    prioritySupport: false,
+  },
+  PRO: {
+    dailyAnalysisLimit: -1,
+    maxSavedHands: -1,
+    dailyImportLimit: -1,
+    bulkImportAllowed: true,
+    leakFinderEnabled: true,
+    rangeVsRangeEnabled: true,
+    icmEnabled: true,
+    dailyAiReviewLimit: -1,
+    maxOpponentProfiles: -1,
+    dataExportEnabled: true,
+    advancedTrainingModeEnabled: true,
+    prioritySupport: true,
+  },
+};
+
+/** Returns the limits table for a given plan. */
+export function getPlanLimits(plan: Plan): PlanLimits {
+  return PLAN_LIMITS[plan];
+}
+
+/** `-1` is this module's sentinel for "no limit" — see the file header. */
+export function isUnlimited(limit: number): boolean {
+  return limit === -1;
+}
+
+/** True once `current` usage has met or exceeded a (possibly unlimited) limit. */
+export function hasReachedLimit(current: number, limit: number): boolean {
+  if (isUnlimited(limit)) return false;
+  return current >= limit;
+}
+
+/**
+ * Actions that are gated by plan. Usage-based actions (e.g. `runAnalysis`)
+ * are checked against a numeric limit + `currentUsage`; boolean-feature
+ * actions (e.g. `useIcmCalculator`) ignore `currentUsage` entirely.
+ */
+export type PlanAction =
+  | "runAnalysis"
+  | "saveHand"
+  | "importHand"
+  | "bulkImportHands"
+  | "useLeakFinder"
+  | "useRangeVsRange"
+  | "useIcmCalculator"
+  | "runAiReview"
+  | "addOpponentProfile"
+  | "exportData";
+
+export interface PlanCheckResult {
+  allowed: boolean;
+  /** Human-readable explanation, present whenever `allowed` is false. */
+  reason?: string;
+  /** True if the only way to unlock this action is upgrading to Pro. */
+  upgradeRequired?: boolean;
+}
+
+const ALLOWED: PlanCheckResult = { allowed: true };
+
+/**
+ * Checks whether a user on `plan` may perform `action` right now.
+ *
+ * `currentUsage` is the count *before* this action would be performed (e.g.
+ * "how many analyses has this user already run today", "how many hands are
+ * already saved", "how many opponent profiles already exist"). It's ignored
+ * for boolean-feature actions.
+ */
+export function canPerformAction(
+  plan: Plan,
+  action: PlanAction,
+  currentUsage = 0
+): PlanCheckResult {
+  const limits = getPlanLimits(plan);
+
+  switch (action) {
+    case "runAnalysis":
+      return checkLimit(
+        currentUsage,
+        limits.dailyAnalysisLimit,
+        "You've reached today's analysis limit on the Free plan."
+      );
+
+    case "saveHand":
+      return checkLimit(
+        currentUsage,
+        limits.maxSavedHands,
+        "You've reached the saved-hands limit on the Free plan."
+      );
+
+    case "importHand":
+      return checkLimit(
+        currentUsage,
+        limits.dailyImportLimit,
+        "You've reached today's import limit on the Free plan."
+      );
+
+    case "bulkImportHands":
+      return checkFeature(
+        limits.bulkImportAllowed,
+        "Bulk hand history import is a Pro feature."
+      );
+
+    case "useLeakFinder":
+      return checkFeature(
+        limits.leakFinderEnabled,
+        "Leak finder & session review is a Pro-only feature."
+      );
+
+    case "useRangeVsRange":
+      return checkFeature(
+        limits.rangeVsRangeEnabled,
+        "Range-vs-range analysis is a Pro-only feature."
+      );
+
+    case "useIcmCalculator":
+      return checkFeature(
+        limits.icmEnabled,
+        "The ICM calculator is a Pro-only feature."
+      );
+
+    case "runAiReview":
+      return checkLimit(
+        currentUsage,
+        limits.dailyAiReviewLimit,
+        "You've used today's AI hand review on the Free plan."
+      );
+
+    case "addOpponentProfile":
+      return checkLimit(
+        currentUsage,
+        limits.maxOpponentProfiles,
+        "You've reached the opponent profile limit on the Free plan."
+      );
+
+    case "exportData":
+      return checkFeature(
+        limits.dataExportEnabled,
+        "Data export is a Pro-only feature."
+      );
+
+    default: {
+      const _exhaustive: never = action;
+      return _exhaustive;
+    }
+  }
+}
+
+function checkLimit(
+  currentUsage: number,
+  limit: number,
+  reason: string
+): PlanCheckResult {
+  if (!hasReachedLimit(currentUsage, limit)) return ALLOWED;
+  return { allowed: false, reason, upgradeRequired: true };
+}
+
+function checkFeature(enabled: boolean, reason: string): PlanCheckResult {
+  if (enabled) return ALLOWED;
+  return { allowed: false, reason, upgradeRequired: true };
+}

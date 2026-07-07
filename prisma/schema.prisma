@@ -1,0 +1,149 @@
+// ---------------------------------------------------------------------------
+// Poker Range Analyzer — Prisma schema
+//
+// LOCAL-ONLY SCAFFOLDING: there is no real Supabase Postgres instance wired
+// up yet. This schema is safe to edit and commit, but it will not do
+// anything until you:
+//   1. Create a Supabase project (or any Postgres instance) and copy its
+//      connection string into DATABASE_URL in your local `.env` (see
+//      `.env.example` at the project root for the placeholder).
+//   2. Run `npx prisma migrate dev --name init` to create the tables.
+//   3. Run `npx prisma generate` to (re)generate the Prisma Client.
+//
+// Do NOT run migrate/generate as part of CI or build steps until a real
+// database is connected — this file is intentionally just a blueprint until
+// then.
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Plan {
+  FREE
+  PRO
+}
+
+enum Street {
+  PREFLOP
+  FLOP
+  TURN
+  RIVER
+}
+
+enum HandSource {
+  MANUAL
+  IMPORTED
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  avatar        String?
+  plan          Plan     @default(FREE)
+  favoriteGame  String?  @map("favorite_game")
+  stakes        String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  hands         Hand[]
+  ranges        Range[]
+  sessions      Session[]
+  opponents     Opponent[]
+  subscription  Subscription?
+
+  @@map("users")
+}
+
+model Hand {
+  id                String     @id @default(cuid())
+  userId            String     @map("user_id")
+  heroCards         String     @map("hero_cards")
+  board             String?
+  villainRange      String     @map("villain_range")
+  street            Street
+  pot               Float
+  result            String?
+  tags              String[]   @default([])
+  equityAtDecision  Float?     @map("equity_at_decision")
+  source            HandSource @default(MANUAL)
+  createdAt         DateTime   @default(now()) @map("created_at")
+
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("hands")
+}
+
+model Range {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  name      String
+  combos    String
+  isPreset  Boolean  @default(false) @map("is_preset")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("ranges")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  name      String
+  handIds   String[] @default([]) @map("hand_ids")
+  statsJson Json?    @map("stats_json")
+  date      DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Opponent {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  name         String
+  notes        String?
+  tendencies   Json?
+  customRange  String?  @map("custom_range")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("opponents")
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique @map("user_id")
+  stripeCustomerId     String    @map("stripe_customer_id")
+  stripeSubscriptionId String?   @map("stripe_subscription_id")
+  plan                 Plan      @default(FREE)
+  status               String
+  currentPeriodEnd     DateTime? @map("current_period_end")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
