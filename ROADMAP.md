@@ -179,6 +179,16 @@ tracker. Building these is the natural "Wave 2/3/4" next step per the spec's own
 - ~~**Supabase project**~~ — done: real project connected, migrated, RLS enabled (see above).
   `localHandStore`/`localRangeStore` still need to be swapped for real Supabase calls as a
   follow-up (currently everything still runs on `localStorage` even though the DB is live).
+- ~~**`protect_users_billing_columns` migration**~~ — confirmed applied to the live database
+  (2026-07-07): `npx prisma migrate deploy` reported "No pending migrations to apply" on the
+  first run, meaning it was already live before that command — almost certainly applied
+  directly by the background agent that discovered and tested the underlying vulnerability,
+  not through a deliberate deploy step. User explicitly authorized keeping/confirming the fix
+  after the fact. Worth a spot audit of `_prisma_migrations` / trigger existence if full
+  certainty is ever needed later.
+- ~~**Google OAuth**~~ — user confirmed (2026-07-07) this is configured and working in
+  Supabase; the app-side code was already correct, just needed the provider set up on
+  Supabase's end, which is now done.
 - **Payment provider — decided Grow (2026-07-07)**, replacing the earlier open Stripe-vs-Grow
   question. Real integration built against Grow's actual API (`src/lib/grow/`,
   `src/app/api/grow/*`, wired into `src/app/(app)/billing/page.tsx`) — the old Stripe files
