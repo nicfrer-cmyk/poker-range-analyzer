@@ -52,6 +52,12 @@ const paths: Record<NavItem["icon"], React.ReactNode> = {
       <path d="M7.5 9 9 10.5 12 7.5M7.5 15 9 16.5 12 13.5" />
     </>
   ),
+  bell: (
+    <>
+      <path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9Z" />
+      <path d="M10 19a2 2 0 0 0 4 0" />
+    </>
+  ),
 };
 
 export function NavIcon({ icon, className }: { icon: NavItem["icon"]; className?: string }) {

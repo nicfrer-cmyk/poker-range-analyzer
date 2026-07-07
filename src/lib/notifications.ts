@@ -2,11 +2,15 @@ import type { StoredHand } from "@/lib/localHandStore";
 import { currentStreak } from "@/lib/leaderboard";
 import { topLeaks } from "@/lib/engine/leakFinder";
 import { loadProgress } from "@/lib/training";
-import { computeSkillTree } from "@/lib/coach/skillTree";
+import { computeSkillTree, type SkillTreeResult } from "@/lib/coach/skillTree";
 import { computeAchievements, type AchievementsInput } from "@/lib/coach/achievements";
 import { getRoadmap } from "@/lib/coach/roadmap";
 import { getIqHistory } from "@/lib/coach/iq";
 import { readJson, writeJson, dateKey } from "@/lib/coach/coachStorage";
+import { generateDailyMissions } from "@/lib/coach/missions";
+import { buildWeeklyReview } from "@/lib/coach/weeklyReview";
+import { formatLeakKey } from "@/lib/labels";
+import { PLAN_LIMITS, isUnlimited, type Plan } from "@/lib/plan";
 
 /**
  * In-app notification center — every notification is recomputed fresh from data that's already
@@ -73,19 +77,12 @@ function streakMilestoneNotification(hands: StoredHand[]): AppNotification | nul
   };
 }
 
-/** Builds the same AchievementsInput src/app/(app)/missions/page.tsx does (loadProgress +
+/** Takes the same AchievementsInput src/app/(app)/missions/page.tsx builds (loadProgress +
  *  computeSkillTree + getRoadmap + getIqHistory), so "unlocked" here means the same thing it
- *  means on the achievements gallery — never a separately-invented definition. */
-function achievementNotifications(hands: StoredHand[]): AppNotification[] {
-  const trainingProgress = loadProgress();
-  const skillTree = computeSkillTree(hands, trainingProgress);
-  const input: AchievementsInput = {
-    hands,
-    trainingProgress,
-    iqHistory: getIqHistory(),
-    roadmap: getRoadmap(),
-    skillTree,
-  };
+ *  means on the achievements gallery — never a separately-invented definition. Precomputed by
+ *  the caller (computeNotifications) since missionReminderNotification needs the same
+ *  trainingProgress/skillTree and recomputing them twice per check would be wasteful. */
+function achievementNotifications(input: AchievementsInput): AppNotification[] {
   return computeAchievements(input)
     .filter((a) => a.earned)
     .map((a) => ({
@@ -94,6 +91,61 @@ function achievementNotifications(hands: StoredHand[]): AppNotification[] {
       href: "/missions",
       createdAt: Date.now(),
     }));
+}
+
+/** Fires while at least one of today's daily missions (same generateDailyMissions() the
+ *  /missions page uses) is still incomplete — id is keyed by day so it naturally disappears
+ *  once all of today's missions are done and reappears fresh tomorrow. */
+function missionReminderNotification(hands: StoredHand[], skillTree: SkillTreeResult): AppNotification | null {
+  const missions = generateDailyMissions(hands, skillTree);
+  const allCompleted = missions.length > 0 && missions.every((m) => m.completed);
+  if (allCompleted) return null;
+  const today = dateKey();
+  return {
+    id: `mission-reminder-${today}`,
+    message: "יש לך משימת לימוד חדשה להיום",
+    href: "/missions",
+    createdAt: startOfDayMs(today),
+  };
+}
+
+/** Free-plan usage nudge — fires once a FREE user has used most of today's daily analysis
+ *  allowance (PLAN_LIMITS.FREE.dailyAnalysisLimit, read-only here). Always skipped for PRO
+ *  (unlimited, no ceiling to nudge about) and skipped entirely when the caller doesn't supply
+ *  plan/usage context (existing callers that haven't been updated yet). */
+const USAGE_NUDGE_THRESHOLD = 0.8;
+
+function usageNudgeNotification(plan: Plan, todayAnalysisCount: number): AppNotification | null {
+  if (plan !== "FREE") return null;
+  const limit = PLAN_LIMITS.FREE.dailyAnalysisLimit;
+  if (isUnlimited(limit) || limit <= 0) return null;
+  if (todayAnalysisCount / limit < USAGE_NUDGE_THRESHOLD) return null;
+  const today = dateKey();
+  return {
+    id: `usage-nudge-${today}`,
+    message: `ניתחת ${todayAnalysisCount} מתוך ${limit} הידיים היומיות בתוכנית החינמית`,
+    href: "/billing",
+    createdAt: Date.now(),
+  };
+}
+
+/** "השתפרת ב-X השבוע" — reuses buildWeeklyReview()'s already-cheap `improved` list (topLeaks
+ *  over the last 7 days + a trend check per leak, the same computation /weekly-review does)
+ *  rather than inventing a new weekly-improvement signal from scratch. Skips the iqWeeklyDelta
+ *  argument (defaults to null) since only `improved` is needed here. */
+function improvementNotification(hands: StoredHand[]): AppNotification | null {
+  if (hands.length === 0) return null;
+  const { improved } = buildWeeklyReview(hands);
+  const top = improved[0];
+  if (!top) return null;
+  const label = formatLeakKey(top.leak.dimension, top.leak.key);
+  const thisWeekKey = isoWeekKey(Date.now());
+  return {
+    id: `improvement-${thisWeekKey}-${top.leak.dimension}-${top.leak.key}`,
+    message: `השתפרת ב-${label} השבוע`,
+    href: "/weekly-review",
+    createdAt: Date.now(),
+  };
 }
 
 /** Fires once per calendar week that has >=1 new hand: the notification's id is keyed by the
@@ -129,15 +181,83 @@ function highSeverityLeakNotification(hands: StoredHand[]): AppNotification | nu
   };
 }
 
-export function computeNotifications(hands: StoredHand[]): AppNotification[] {
-  const items: Array<AppNotification | null> = [
-    highSeverityLeakNotification(hands),
-    streakMilestoneNotification(hands),
-    weeklyReportNotification(hands),
-    noHandsTodayNotification(hands),
-    ...achievementNotifications(hands),
+/** The 4 notification "kinds" a user can individually mute from Settings → התראות. Notifications
+ *  that aren't tied to a category (streak milestones, achievements, high-severity leaks, weekly
+ *  improvement) are treated as always-on core signals — there was no toggle requested for them,
+ *  and they're exactly what survives the "low" frequency filter below too. */
+export type NotificationCategory = "weeklyReport" | "missions" | "returnToApp" | "productUpdates";
+
+export type NotificationFrequency = "low" | "normal" | "high";
+
+export const NOTIFICATION_CATEGORY_LABEL: Record<NotificationCategory, string> = {
+  weeklyReport: "דוח שבועי",
+  missions: "משימות",
+  returnToApp: "חזרה לאפליקציה",
+  productUpdates: "עדכוני מוצר/מנוי",
+};
+
+export interface NotificationContext {
+  /** Current plan — defaults to "FREE" (harmless default: with todayAnalysisCount also
+   *  defaulting to 0, the usage nudge simply never fires for callers that don't pass this). */
+  plan?: Plan;
+  todayAnalysisCount?: number;
+  /** Master on/off switch. Defaults to true. When false, no notifications are returned at all —
+   *  which also means the bell's unread badge naturally goes to 0. */
+  enabled?: boolean;
+  frequency?: NotificationFrequency;
+  categories?: Partial<Record<NotificationCategory, boolean>>;
+}
+
+interface CategorizedNotification {
+  notification: AppNotification | null;
+  category?: NotificationCategory;
+}
+
+export function computeNotifications(hands: StoredHand[], context: NotificationContext = {}): AppNotification[] {
+  if (context.enabled === false) return [];
+
+  const plan: Plan = context.plan ?? "FREE";
+  const todayAnalysisCount = context.todayAnalysisCount ?? 0;
+  const frequency: NotificationFrequency = context.frequency ?? "normal";
+  const categories: Record<NotificationCategory, boolean> = {
+    weeklyReport: true,
+    missions: true,
+    returnToApp: true,
+    productUpdates: true,
+    ...context.categories,
+  };
+
+  // Shared across achievements + the mission reminder so this only runs once per check.
+  const trainingProgress = loadProgress();
+  const skillTree = computeSkillTree(hands, trainingProgress);
+  const achievementsInput: AchievementsInput = {
+    hands,
+    trainingProgress,
+    iqHistory: getIqHistory(),
+    roadmap: getRoadmap(),
+    skillTree,
+  };
+
+  const candidates: CategorizedNotification[] = [
+    { notification: highSeverityLeakNotification(hands) },
+    { notification: streakMilestoneNotification(hands) },
+    { notification: improvementNotification(hands) },
+    { notification: weeklyReportNotification(hands), category: "weeklyReport" },
+    { notification: noHandsTodayNotification(hands), category: "returnToApp" },
+    { notification: missionReminderNotification(hands, skillTree), category: "missions" },
+    { notification: usageNudgeNotification(plan, todayAnalysisCount), category: "productUpdates" },
+    ...achievementNotifications(achievementsInput).map((notification) => ({ notification })),
   ];
-  return items.filter((n): n is AppNotification => n !== null);
+
+  return candidates
+    .filter((c): c is { notification: AppNotification; category?: NotificationCategory } => c.notification !== null)
+    // Category toggle: hide anything the user muted in Settings.
+    .filter((c) => !c.category || categories[c.category])
+    // "low" frequency: only the always-on core signals get through, regardless of category
+    // toggles above. "normal" and "high" currently behave the same — there's no extra tier of
+    // notification worth adding on top of "normal" yet, so "high" doesn't fake one.
+    .filter((c) => frequency !== "low" || c.category === undefined)
+    .map((c) => c.notification);
 }
 
 // ---------------------------------------------------------------------------
@@ -161,4 +281,70 @@ export function markAllRead(ids: string[]): void {
 export function unreadNotifications(notifications: AppNotification[]): AppNotification[] {
   const readIds = new Set(getReadIds());
   return notifications.filter((n) => !readIds.has(n.id));
+}
+
+// ---------------------------------------------------------------------------
+// Dismissed state (localStorage) — same rationale as read/unread above: notifications are
+// recomputed fresh, so "deleting" one from the /notifications page can't remove a record that
+// doesn't exist. Instead it's remembered as permanently dismissed, the same way "read" is
+// remembered, so it stays hidden even if its underlying condition is still true on a later check.
+// ---------------------------------------------------------------------------
+
+const DISMISSED_IDS_KEY = "pra:notifications:dismissed:v1";
+const MAX_DISMISSED_IDS = 200;
+
+export function getDismissedIds(): string[] {
+  return readJson<string[]>(DISMISSED_IDS_KEY, []);
+}
+
+export function dismissNotification(id: string): void {
+  const merged = [...getDismissedIds().filter((existing) => existing !== id), id];
+  writeJson(DISMISSED_IDS_KEY, merged.slice(-MAX_DISMISSED_IDS));
+}
+
+/** Filters dismissed notifications out — call after computeNotifications() in every UI surface
+ *  (bell dropdown, /notifications page) so a deleted notification stays gone everywhere. */
+export function visibleNotifications(notifications: AppNotification[]): AppNotification[] {
+  const dismissedIds = new Set(getDismissedIds());
+  return notifications.filter((n) => !dismissedIds.has(n.id));
+}
+
+// ---------------------------------------------------------------------------
+// Notification settings (localStorage) — master on/off, frequency preference, and per-category
+// mute toggles, set from Settings → התראות. Read here by UI callers (NotificationBell, the
+// settings page, /notifications) and passed into computeNotifications() as a NotificationContext;
+// computeNotifications itself never touches localStorage directly, so it stays a pure function
+// of its explicit arguments.
+// ---------------------------------------------------------------------------
+
+export interface NotificationSettings {
+  enabled: boolean;
+  frequency: NotificationFrequency;
+  categories: Record<NotificationCategory, boolean>;
+}
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  enabled: true,
+  frequency: "normal",
+  categories: {
+    weeklyReport: true,
+    missions: true,
+    returnToApp: true,
+    productUpdates: true,
+  },
+};
+
+const SETTINGS_KEY = "pra:notifications:settings:v1";
+
+export function getNotificationSettings(): NotificationSettings {
+  const stored = readJson<Partial<NotificationSettings>>(SETTINGS_KEY, {});
+  return {
+    ...DEFAULT_NOTIFICATION_SETTINGS,
+    ...stored,
+    categories: { ...DEFAULT_NOTIFICATION_SETTINGS.categories, ...stored.categories },
+  };
+}
+
+export function saveNotificationSettings(settings: NotificationSettings): void {
+  writeJson(SETTINGS_KEY, settings);
 }

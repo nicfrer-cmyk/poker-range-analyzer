@@ -9,6 +9,7 @@ import { StepIndicator } from "@/components/wizard/StepIndicator";
 import { WizardNav } from "@/components/wizard/WizardNav";
 import { HeroSummary } from "@/components/analysis/HeroSummary";
 import { ResultsSummaryBar } from "@/components/analysis/ResultsSummaryBar";
+import { QuickAnalysis } from "@/components/analysis/QuickAnalysis";
 import { KeyInsights } from "@/components/analysis/KeyInsights";
 import { PotOddsPanel } from "@/components/analysis/PotOddsPanel";
 import { RangePieChart } from "@/components/range/RangePieChart";
@@ -33,8 +34,11 @@ import { getTodayCount, incrementToday } from "@/lib/usageTracker";
 
 const TOTAL_STEPS = 5;
 
+type EntryMode = "choice" | "quick" | "advanced";
+
 export default function AnalyzePage() {
   const { input } = useAnalysisStore();
+  const [mode, setMode] = useState<EntryMode>("choice");
   const [step, setStep] = useState(1);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [matrixEquities, setMatrixEquities] = useState<Record<string, number>>({});
@@ -132,130 +136,198 @@ export default function AnalyzePage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">ניתוח יד חדשה</h1>
-      <StepIndicator step={step} />
 
-      {step === 1 && <Step1GameType />}
-      {step === 2 && <Step2Cards />}
-      {step === 3 && <Step3PotDecision />}
-      {step === 4 && <Step4VillainRange />}
-
-      {step === 4 && nearAnalysisLimit && (
-        <div className="flex justify-end">
-          <Badge tone="close">כמעט הגעת למגבלת הניתוחים היומית בתוכנית החינמית</Badge>
+      {mode === "choice" && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Panel className="flex flex-col">
+            <PanelBody className="flex flex-1 flex-col gap-4">
+              <div>
+                <h2 className="text-lg font-semibold">ניתוח מהיר</h2>
+                <p className="mt-2 text-sm text-base-muted">
+                  בחר את היד שלך ואת הפלופ וקבל אחוזים ראשוניים מיד.
+                </p>
+              </div>
+              <Button className="mt-auto" onClick={() => setMode("quick")}>
+                התחל ניתוח מהיר
+              </Button>
+            </PanelBody>
+          </Panel>
+          <Panel className="flex flex-col">
+            <PanelBody className="flex flex-1 flex-col gap-4">
+              <div>
+                <h2 className="text-lg font-semibold">ניתוח מתקדם</h2>
+                <p className="mt-2 text-sm text-base-muted">
+                  הוסף טווח יריב, פוזיציות, קופה ומהלכים לניתוח עמוק יותר.
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                className="mt-auto"
+                onClick={() => {
+                  setStep(1);
+                  setMode("advanced");
+                }}
+              >
+                התחל ניתוח מתקדם
+              </Button>
+            </PanelBody>
+          </Panel>
         </div>
       )}
 
-      {step < 5 && (
-        <WizardNav
-          step={step}
-          totalSteps={TOTAL_STEPS}
-          canGoNext={canGoNext}
-          onBack={() => setStep((s) => Math.max(1, s - 1))}
-          onNext={() => setStep((s) => Math.min(TOTAL_STEPS, s + 1))}
-          nextLabel={step === 4 ? "הצג ניתוח" : "המשך"}
+      {mode !== "choice" && (
+        <div className="flex justify-start">
+          <Button variant="ghost" onClick={() => setMode("choice")}>
+            ← חזרה לבחירת סוג ניתוח
+          </Button>
+        </div>
+      )}
+
+      {mode === "quick" && (
+        <QuickAnalysis
+          onContinueToAdvanced={() => {
+            setStep(2);
+            setMode("advanced");
+          }}
         />
       )}
 
-      {step === 5 && (
-        <div className="space-y-6">
-          <div className="flex justify-start">
-            <Button variant="ghost" onClick={() => setStep(4)}>
-              ← חזרה לעריכה
-            </Button>
-          </div>
+      {mode === "advanced" && (
+        <>
+          <StepIndicator step={step} />
 
-          {gateMessage && (
-            <Panel className="border-status-risky/40">
-              <PanelBody className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <span className="text-sm text-status-risky">{gateMessage}</span>
-                <a href="/billing">
-                  <Button size="sm">שדרוג לפרו</Button>
-                </a>
-              </PanelBody>
-            </Panel>
+          {step === 1 && <Step1GameType />}
+          {step === 2 && <Step2Cards />}
+          {step === 3 && <Step3PotDecision />}
+          {step === 4 && <Step4VillainRange />}
+
+          {step === 4 && nearAnalysisLimit && (
+            <div className="flex justify-end">
+              <Badge tone="close">כמעט הגעת למגבלת הניתוחים היומית בתוכנית החינמית</Badge>
+            </div>
           )}
 
-          {computing && !result && (
-            <Panel>
-              <PanelBody className="py-10 text-center text-sm text-base-muted">מחשב אקוויטי…</PanelBody>
-            </Panel>
+          {step < 5 && (
+            <WizardNav
+              step={step}
+              totalSteps={TOTAL_STEPS}
+              canGoNext={canGoNext}
+              onBack={() => setStep((s) => Math.max(1, s - 1))}
+              onNext={() => setStep((s) => Math.min(TOTAL_STEPS, s + 1))}
+              nextLabel={step === 4 ? "הצג ניתוח" : "המשך"}
+            />
           )}
 
-          {result && (
-            <>
-              <ResultsSummaryBar input={input} result={result} />
-
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    const gate = canPerformAction(plan, "saveHand", listHands().length);
-                    if (!gate.allowed) {
-                      setGateMessage(gate.reason ?? "לא ניתן לשמור עוד ידיים במסלול הזה.");
-                      return;
-                    }
-                    saveHand({
-                      input,
-                      result,
-                      action: input.actionTaken,
-                      position: input.heroPosition,
-                    });
-                    setSaved(true);
-                  }}
-                >
-                  {saved ? "נשמר ✓" : "שמור ניתוח"}
+          {step === 5 && (
+            <div className="space-y-6">
+              <div className="flex justify-start">
+                <Button variant="ghost" onClick={() => setStep(4)}>
+                  ← חזרה לעריכה
                 </Button>
               </div>
 
-              <HeroSummary result={result} />
-              <PotOddsPanel result={result} />
-              <CoachPanel messages={result.coachMessages} />
-
-              <div className="grid gap-6 lg:grid-cols-2">
-                <KeyInsights insights={result.keyInsights} />
-                <RangePieChart buckets={result.rangeComposition} />
-              </div>
-
-              <div className="flex justify-center">
-                <Button variant="secondary" onClick={() => setShowDeep((s) => !s)}>
-                  {showDeep ? "הסתר ניתוח מעמיק" : "הצג ניתוח מעמיק"}
-                </Button>
-              </div>
-
-              {showDeep && computingDeep && (
-                <Panel>
-                  <PanelBody className="py-8 text-center text-sm text-base-muted">
-                    מחשב ניתוח מעמיק…
+              {gateMessage && (
+                <Panel className="border-status-risky/40">
+                  <PanelBody className="flex flex-wrap items-center justify-between gap-3 py-3">
+                    <span className="text-sm text-status-risky">{gateMessage}</span>
+                    <a href="/billing">
+                      <Button size="sm">שדרוג לפרו</Button>
+                    </a>
                   </PanelBody>
                 </Panel>
               )}
-              {showDeep && !computingDeep && (
-                <div className="space-y-6">
-                  <Panel>
-                    <PanelBody>
-                      <p className="mb-3 text-sm font-semibold">
-                        מטריצת טווח — האקוויטי שלי מול כל קומבינציה
-                      </p>
-                      <p className="mb-3 text-xs text-base-muted">
-                        לחיצה על קומבינציה פותחת חקירה מעמיקה שלה מול הידיים שלך.
-                      </p>
-                      <RangeMatrix
-                        equities={matrixEquities}
-                        onTooltip={tooltipFor}
-                        onCellClick={setSelectedComboLabel}
-                      />
-                    </PanelBody>
-                  </Panel>
-                  <div className="grid gap-6 lg:grid-cols-2">
-                    <WhatChanged items={result.whatChanged} />
-                    <CardsToWatch best={nextCardOutlook.best} worst={nextCardOutlook.worst} />
-                  </div>
-                  <BlockerPanel blockers={result.blockers} />
-                </div>
+
+              {computing && !result && (
+                <Panel>
+                  <PanelBody className="py-10 text-center text-sm text-base-muted">מחשב אקוויטי…</PanelBody>
+                </Panel>
               )}
-            </>
+
+              {result && (
+                <>
+                  <ResultsSummaryBar
+                    input={input}
+                    stats={{
+                      kind: "equity",
+                      heroEquityPct: result.heroEquityPct,
+                      villainEquityPct: result.villainEquityPct,
+                      outs: result.heroDraw !== "none" ? result.spr.outs : undefined,
+                    }}
+                  />
+
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        const gate = canPerformAction(plan, "saveHand", listHands().length);
+                        if (!gate.allowed) {
+                          setGateMessage(gate.reason ?? "לא ניתן לשמור עוד ידיים במסלול הזה.");
+                          return;
+                        }
+                        saveHand({
+                          input,
+                          result,
+                          action: input.actionTaken,
+                          position: input.heroPosition,
+                        });
+                        setSaved(true);
+                      }}
+                    >
+                      {saved ? "נשמר ✓" : "שמור ניתוח"}
+                    </Button>
+                  </div>
+
+                  <HeroSummary result={result} />
+                  <PotOddsPanel result={result} />
+                  <CoachPanel messages={result.coachMessages} />
+
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    <KeyInsights insights={result.keyInsights} />
+                    <RangePieChart buckets={result.rangeComposition} />
+                  </div>
+
+                  <div className="flex justify-center">
+                    <Button variant="secondary" onClick={() => setShowDeep((s) => !s)}>
+                      {showDeep ? "הסתר ניתוח מעמיק" : "הצג ניתוח מעמיק"}
+                    </Button>
+                  </div>
+
+                  {showDeep && computingDeep && (
+                    <Panel>
+                      <PanelBody className="py-8 text-center text-sm text-base-muted">
+                        מחשב ניתוח מעמיק…
+                      </PanelBody>
+                    </Panel>
+                  )}
+                  {showDeep && !computingDeep && (
+                    <div className="space-y-6">
+                      <Panel>
+                        <PanelBody>
+                          <p className="mb-3 text-sm font-semibold">
+                            מטריצת טווח — האקוויטי שלי מול כל קומבינציה
+                          </p>
+                          <p className="mb-3 text-xs text-base-muted">
+                            לחיצה על קומבינציה פותחת חקירה מעמיקה שלה מול הידיים שלך.
+                          </p>
+                          <RangeMatrix
+                            equities={matrixEquities}
+                            onTooltip={tooltipFor}
+                            onCellClick={setSelectedComboLabel}
+                          />
+                        </PanelBody>
+                      </Panel>
+                      <div className="grid gap-6 lg:grid-cols-2">
+                        <WhatChanged items={result.whatChanged} />
+                        <CardsToWatch best={nextCardOutlook.best} worst={nextCardOutlook.worst} />
+                      </div>
+                      <BlockerPanel blockers={result.blockers} />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
 
       {selectedComboLabel && heroCombo && (

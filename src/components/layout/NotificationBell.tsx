@@ -5,7 +5,16 @@ import Link from "next/link";
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { listHands } from "@/lib/localHandStore";
-import { computeNotifications, markAllRead, unreadNotifications, type AppNotification } from "@/lib/notifications";
+import {
+  computeNotifications,
+  markAllRead,
+  unreadNotifications,
+  visibleNotifications,
+  getNotificationSettings,
+  type AppNotification,
+} from "@/lib/notifications";
+import { useMockPlan } from "@/lib/useMockPlan";
+import { getTodayCount } from "@/lib/usageTracker";
 
 function relativeTimeHe(ts: number): string {
   const diffMs = Date.now() - ts;
@@ -22,13 +31,21 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
+  const [plan] = useMockPlan();
 
   // Recompute fresh from local data on mount — no push notifications, no stored event log.
   useEffect(() => {
-    const items = computeNotifications(listHands());
+    const settings = getNotificationSettings();
+    const items = visibleNotifications(
+      computeNotifications(listHands(), {
+        plan,
+        todayAnalysisCount: getTodayCount("analysis"),
+        ...settings,
+      })
+    );
     setNotifications(items);
     setUnreadCount(unreadNotifications(items).length);
-  }, []);
+  }, [plan]);
 
   const handleToggle = () => {
     if (!open) {
@@ -71,7 +88,7 @@ export function NotificationBell() {
                 {notifications.length === 0 ? (
                   <p className="py-6 text-center text-sm text-base-muted">אין התראות חדשות כרגע.</p>
                 ) : (
-                  notifications.map((n) => (
+                  notifications.slice(0, 5).map((n) => (
                     <Link
                       key={n.id}
                       href={n.href}
@@ -84,6 +101,13 @@ export function NotificationBell() {
                   ))
                 )}
               </PanelBody>
+              <Link
+                href="/notifications"
+                onClick={() => setOpen(false)}
+                className="block border-t border-base-border px-4 py-2.5 text-center text-sm text-accent-soft transition-colors hover:bg-base-panel2"
+              >
+                כל ההתראות
+              </Link>
             </Panel>
           </div>
         </>

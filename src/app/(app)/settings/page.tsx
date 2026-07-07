@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useMockPlan } from "@/lib/useMockPlan";
 import { useTheme } from "@/lib/useTheme";
+import { useNotificationSettings } from "@/lib/useNotificationSettings";
+import { NOTIFICATION_CATEGORY_LABEL, type NotificationCategory, type NotificationFrequency } from "@/lib/notifications";
 import { listHands, clearAllHands, downloadTextFile } from "@/lib/localHandStore";
 import { listOpponents, clearAllOpponents } from "@/lib/localOpponentStore";
 import { listSessions, clearAllSessions } from "@/lib/localSessionStore";
@@ -40,6 +42,7 @@ function deleteAllData() {
 export default function SettingsPage() {
   const [plan, setPlan] = useMockPlan();
   const [theme, setTheme] = useTheme();
+  const [notificationSettings, setNotificationSettings] = useNotificationSettings();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [exportGateMessage, setExportGateMessage] = useState<string | null>(null);
@@ -88,6 +91,21 @@ export default function SettingsPage() {
   const handleSignOut = async () => {
     setSigningOut(true);
     await signOut();
+  };
+
+  const toggleNotificationsEnabled = () => {
+    setNotificationSettings({ ...notificationSettings, enabled: !notificationSettings.enabled });
+  };
+
+  const setNotificationFrequency = (frequency: NotificationFrequency) => {
+    setNotificationSettings({ ...notificationSettings, frequency });
+  };
+
+  const toggleNotificationCategory = (category: NotificationCategory) => {
+    setNotificationSettings({
+      ...notificationSettings,
+      categories: { ...notificationSettings.categories, [category]: !notificationSettings.categories[category] },
+    });
   };
 
   return (
@@ -190,6 +208,85 @@ export default function SettingsPage() {
               <Button variant="secondary" size="sm" onClick={handleReplayOnboarding} disabled={!userId}>
                 הצג את סיור ההיכרות מחדש
               </Button>
+            </div>
+          </div>
+        </PanelBody>
+      </Panel>
+
+      <Panel>
+        <PanelHeader>
+          <PanelTitle>התראות</PanelTitle>
+          <Badge tone={notificationSettings.enabled ? "ahead" : "neutral"}>
+            {notificationSettings.enabled ? "פעיל" : "כבוי"}
+          </Badge>
+        </PanelHeader>
+        <PanelBody className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">הפעלת התראות</p>
+              <p className="text-sm text-base-muted">כיבוי מוחלט מסתיר גם את מספר ההתראות שלא נקראו בפעמון.</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={notificationSettings.enabled ? "primary" : "secondary"}
+                size="sm"
+                onClick={() => notificationSettings.enabled || toggleNotificationsEnabled()}
+              >
+                הפעל
+              </Button>
+              <Button
+                variant={!notificationSettings.enabled ? "primary" : "secondary"}
+                size="sm"
+                onClick={() => notificationSettings.enabled && toggleNotificationsEnabled()}
+              >
+                כבה
+              </Button>
+            </div>
+          </div>
+
+          <div className="border-t border-base-border pt-4">
+            <p className="text-sm font-medium">תדירות</p>
+            <p className="mt-1 text-sm text-base-muted">
+              נמוכה מציגה רק אירועים משמעותיים (רצפים, הישגים ודליפות חמורות). רגילה וגבוהה מציגות
+              את כל סוגי ההתראות שמופעלים למטה.
+            </p>
+            <div className="mt-2 flex gap-2">
+              {(
+                [
+                  { value: "low", label: "נמוכה" },
+                  { value: "normal", label: "רגילה" },
+                  { value: "high", label: "גבוהה" },
+                ] as { value: NotificationFrequency; label: string }[]
+              ).map((f) => (
+                <Button
+                  key={f.value}
+                  variant={notificationSettings.frequency === f.value ? "primary" : "secondary"}
+                  size="sm"
+                  disabled={!notificationSettings.enabled}
+                  onClick={() => setNotificationFrequency(f.value)}
+                >
+                  {f.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-base-border pt-4">
+            <p className="text-sm font-medium">לפי קטגוריה</p>
+            <div className="mt-2 space-y-2">
+              {(Object.keys(NOTIFICATION_CATEGORY_LABEL) as NotificationCategory[]).map((category) => (
+                <div key={category} className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-base-text">{NOTIFICATION_CATEGORY_LABEL[category]}</span>
+                  <Button
+                    variant={notificationSettings.categories[category] ? "primary" : "secondary"}
+                    size="sm"
+                    disabled={!notificationSettings.enabled}
+                    onClick={() => toggleNotificationCategory(category)}
+                  >
+                    {notificationSettings.categories[category] ? "מופעל" : "כבוי"}
+                  </Button>
+                </div>
+              ))}
             </div>
           </div>
         </PanelBody>

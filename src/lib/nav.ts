@@ -30,5 +30,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/opponents", label: "יריבים", icon: "users", section: "tools" },
   { href: "/leaderboard", label: "אתגרים", icon: "star", section: "tools" },
   { href: "/billing", label: "מנוי", icon: "star", section: "account" },
+  { href: "/notifications", label: "התראות", icon: "bell", section: "account" },
   { href: "/settings", label: "הגדרות", icon: "gear", section: "account", mobile: true },
 ];

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel";
 import { Button } from "@/components/ui/Button";
 import {
@@ -7,6 +8,7 @@ import {
   POSITIONS_BY_TABLE_SIZE,
   type GameType,
 } from "@/lib/store/analysisStore";
+import { listSavedSpots, createSavedSpot, deleteSavedSpot, type SavedSpot } from "@/lib/localSavedSpotStore";
 
 const GAME_TYPES: { value: GameType; label: string }[] = [
   { value: "cash", label: "קאש" },
@@ -31,6 +33,45 @@ const inputClass =
 export function Step1GameType() {
   const { input, setField } = useAnalysisStore();
   const positions = POSITIONS_BY_TABLE_SIZE[input.tableSize] ?? POSITIONS_BY_TABLE_SIZE[6]!;
+
+  const [savedSpots, setSavedSpots] = useState<SavedSpot[]>([]);
+  const [savingSpot, setSavingSpot] = useState(false);
+  const [spotLabel, setSpotLabel] = useState("");
+
+  useEffect(() => {
+    setSavedSpots(listSavedSpots());
+  }, []);
+
+  const defaultSpotLabel = `${input.heroPosition} מול ${input.villainPosition}`;
+
+  const openSaveSpotPrompt = () => {
+    setSpotLabel(defaultSpotLabel);
+    setSavingSpot(true);
+  };
+
+  const confirmSaveSpot = () => {
+    const label = spotLabel.trim() || defaultSpotLabel;
+    createSavedSpot({
+      label,
+      tableSize: input.tableSize,
+      heroPosition: input.heroPosition,
+      villainPosition: input.villainPosition,
+    });
+    setSavedSpots(listSavedSpots());
+    setSavingSpot(false);
+  };
+
+  const applySavedSpot = (spot: SavedSpot) => {
+    setField("tableSize", spot.tableSize);
+    const opts = POSITIONS_BY_TABLE_SIZE[spot.tableSize] ?? POSITIONS_BY_TABLE_SIZE[6]!;
+    setField("heroPosition", opts.includes(spot.heroPosition) ? spot.heroPosition : opts[0]!);
+    setField("villainPosition", opts.includes(spot.villainPosition) ? spot.villainPosition : opts[opts.length - 1]!);
+  };
+
+  const removeSavedSpot = (id: string) => {
+    deleteSavedSpot(id);
+    setSavedSpots(listSavedSpots());
+  };
 
   return (
     <Panel>
@@ -128,6 +169,65 @@ export function Step1GameType() {
             </select>
           </Field>
         </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {!savingSpot ? (
+            <Button type="button" variant="ghost" size="sm" onClick={openSaveSpotPrompt}>
+              ★ שמור כספוט מועדף
+            </Button>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                autoFocus
+                value={spotLabel}
+                onChange={(e) => setSpotLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") confirmSaveSpot();
+                  if (e.key === "Escape") setSavingSpot(false);
+                }}
+                placeholder={defaultSpotLabel}
+                className={`${inputClass} w-48`}
+              />
+              <Button type="button" size="sm" onClick={confirmSaveSpot}>
+                שמירה
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setSavingSpot(false)}>
+                ביטול
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {savedSpots.length > 0 && (
+          <div className="border-t border-base-border pt-3">
+            <p className="mb-2 text-xs text-base-muted">ספוטים מועדפים</p>
+            <div className="flex flex-wrap gap-2">
+              {savedSpots.map((spot) => (
+                <span
+                  key={spot.id}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-base-border bg-base-panel2 ps-3 pe-1.5 py-1 text-xs text-base-text"
+                >
+                  <button
+                    type="button"
+                    onClick={() => applySavedSpot(spot)}
+                    className="hover:text-accent-soft"
+                  >
+                    {spot.label}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeSavedSpot(spot.id)}
+                    aria-label={`מחק את הספוט ${spot.label}`}
+                    className="flex h-4 w-4 items-center justify-center rounded-full text-base-muted hover:bg-base-border hover:text-base-text"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </PanelBody>
     </Panel>
   );
