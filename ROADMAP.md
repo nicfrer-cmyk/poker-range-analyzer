@@ -34,9 +34,32 @@ assuming something is "done."
 - PWA: manifest + service worker (network-first/cache-fallback) + placeholder icons
 
 **Data layer**: hands/ranges are stored in `localStorage` right now (`src/lib/localHandStore.ts`,
-`src/lib/localRangeStore.ts`) so the app is fully usable before Supabase is connected. Prisma
-schema (`prisma/schema.prisma`) mirrors the spec's table design and is ready to migrate once a
-real database exists.
+`src/lib/localRangeStore.ts`) — the app is fully usable without Supabase. A real Supabase
+Postgres project IS now connected and migrated (see below); the local-storage layer just
+hasn't been swapped for real Supabase-backed calls yet (that swap is the next real step).
+
+**Supabase — connected 2026-07-07**: real project provisioned, schema migrated
+(`prisma/migrations/20260707083717_init`), RLS enabled + auth-trigger migration applied
+(`prisma/migrations/20260707090000_auth_trigger_and_rls`). Notes for next time:
+- Project's **direct connection** (`db.<ref>.supabase.co:5432`) is IPv6-only and unreachable
+  from this network — use the **Session pooler** connection string (IPv4,
+  `aws-0-<region>.pooler.supabase.com:5432`, username `postgres.<project-ref>`) for
+  `DIRECT_URL`, and the **Transaction pooler** (`:6543`, `?pgbouncer=true`) for `DATABASE_URL`.
+  Both are on the Database settings page, different tabs.
+- `prisma migrate dev` refuses to run non-interactively (this environment). Workflow used
+  instead: `prisma migrate diff --from-empty --to-schema-datamodel ... --script` to generate
+  the SQL, hand-write a `migration_lock.toml`, then `prisma migrate deploy` to apply — same
+  end state, just skips the interactive wizard.
+- New Supabase projects come with one pre-existing placeholder table in `public` (named after
+  the project) that blocks `migrate deploy`'s "schema not empty" check — drop it first.
+- `public.users.id` is **not** a Prisma-generated cuid in practice — a Postgres trigger
+  (`handle_new_auth_user`, in the RLS migration) mirrors every new `auth.users` row into
+  `public.users` using the *same* UUID, which is what makes `auth.uid() = user_id` RLS
+  policies actually work. Don't let application code insert `users` rows with a fresh cuid;
+  the trigger is the only thing that should create them.
+- RLS is enabled on all 6 tables with owner-only policies (`ranges` also allows reading
+  `is_preset = true` rows for everyone). `subscriptions` is read-only from the client — all
+  writes go through the service-role key in the Stripe webhook handler.
 
 ## Explicitly deferred / stubbed (by design, per spec's own wave plan)
 
@@ -47,12 +70,10 @@ tracker. Building these is the natural "Wave 2/3/4" next step per the spec's own
 
 ## Blocked on the user — cannot proceed without these
 
-- **GitHub**: no remote connected yet. Repo is git-initialized locally with one commit.
-- **Supabase project**: `.env` needs `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`,
-  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` from a real project, then run
-  `npx prisma migrate dev` to create the tables and enable RLS policies (not yet written —
-  do this alongside connecting the real project, since RLS policies need a live schema to
-  test against).
+- ~~**GitHub**~~ — done: pushed to https://github.com/nicfrer-cmyk/poker-range-analyzer.
+- ~~**Supabase project**~~ — done: real project connected, migrated, RLS enabled (see above).
+  `localHandStore`/`localRangeStore` still need to be swapped for real Supabase calls as a
+  follow-up (currently everything still runs on `localStorage` even though the DB is live).
 - **Stripe**: needs a real account, two Price IDs (`STRIPE_PRICE_PRO_MONTHLY`,
   `STRIPE_PRICE_PRO_ANNUAL`), and a webhook signing secret, all created from the Stripe
   dashboard. Pricing shown ($14/mo, $118/yr) is a placeholder per the spec's own note — real
@@ -80,9 +101,9 @@ tracker. Building these is the natural "Wave 2/3/4" next step per the spec's own
 
 ## Next steps once the user is ready
 
-1. Create/connect a GitHub repo, push.
-2. Create a Supabase project, set env vars, run migrations, write RLS policies, swap
-   `localHandStore`/`localRangeStore` for real Supabase-backed calls.
+1. ~~Create/connect a GitHub repo, push.~~ Done.
+2. ~~Create a Supabase project, set env vars, run migrations, write RLS policies.~~ Done.
+   Remaining: swap `localHandStore`/`localRangeStore` for real Supabase-backed calls.
 3. Create a Stripe account (test mode first), set Price IDs + webhook secret, test the
    checkout → webhook → plan-upgrade flow end to end.
 4. Deploy to Netlify (or chosen host), point Stripe webhook + Supabase Auth redirect URLs at
