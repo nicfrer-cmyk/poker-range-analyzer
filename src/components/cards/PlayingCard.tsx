@@ -9,7 +9,7 @@ const sizeClasses: Record<CardSize, string> = {
   xs: "w-6 h-8 text-[10px] rounded-[4px]",
   sm: "w-8 h-11 text-xs rounded-[6px]",
   md: "w-12 h-16 text-base rounded-lg",
-  lg: "w-16 h-22 text-xl rounded-xl",
+  lg: "w-16 h-24 text-xl rounded-xl",
 };
 
 /** card is a two-character code like "Ah", "Td", "9s" — rank + suit letter. */
@@ -28,12 +28,12 @@ export function PlayingCard({
     return (
       <div
         className={cn(
-          "flex items-center justify-center border border-base-border bg-gradient-to-br from-accent/40 to-accent/10 shadow-soft",
+          "flex items-center justify-center border border-base-border bg-gradient-to-br from-accent/70 to-accent/40 shadow-soft",
           sizeClasses[size],
           className
         )}
       >
-        <span className="text-white/40">♠</span>
+        <span className="text-white/70">♠</span>
       </div>
     );
   }

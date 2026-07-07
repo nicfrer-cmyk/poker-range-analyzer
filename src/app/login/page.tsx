@@ -30,7 +30,7 @@ export default function LoginPage({
         <PanelBody className="space-y-5">
           <div className="text-center">
             <span className="text-2xl">♠</span>
-            <h1 className="mt-2 text-lg font-semibold">Sign in to Poker Range Analyzer</h1>
+            <h1 className="mt-2 text-lg font-semibold">התחברות למנתח טווחי פוקר</h1>
           </div>
           {searchParams.error && (
             <p className="rounded-lg border border-status-behind/40 bg-status-behind/10 px-3 py-2 text-xs text-status-behind">
@@ -42,29 +42,29 @@ export default function LoginPage({
               name="email"
               type="email"
               required
-              placeholder="Email"
+              placeholder="אימייל"
               className="w-full rounded-lg border border-base-border bg-base-panel2 px-3 py-2 text-sm outline-none focus:border-accent"
             />
             <input
               name="password"
               type="password"
               required
-              placeholder="Password"
+              placeholder="סיסמה"
               className="w-full rounded-lg border border-base-border bg-base-panel2 px-3 py-2 text-sm outline-none focus:border-accent"
             />
             <Button type="submit" className="w-full">
-              Sign In
+              התחבר
             </Button>
           </form>
           <form action={googleAction}>
             <Button type="submit" variant="secondary" className="w-full">
-              Continue with Google
+              המשך עם גוגל
             </Button>
           </form>
           <p className="text-center text-xs text-base-muted">
-            No account?{" "}
+            אין לך חשבון?{" "}
             <Link href="/signup" className="text-accent-soft">
-              Sign up
+              הרשמה
             </Link>
           </p>
         </PanelBody>

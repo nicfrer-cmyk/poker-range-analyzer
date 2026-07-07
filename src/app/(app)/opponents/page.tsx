@@ -3,9 +3,9 @@ import { ComingSoon } from "@/components/ui/ComingSoon";
 export default function OpponentsPage() {
   return (
     <ComingSoon
-      wave="Wave 3 — Depth"
-      title="Opponent Profiles"
-      description="Save notes, tendencies, and custom ranges per opponent — so your next hand against a familiar villain loads their real range instead of a generic one. Coming soon."
+      wave="גל 3 — העמקה"
+      title="פרופילי יריבים"
+      description="שמור הערות, נטיות וטווחים מותאמים אישית לכל יריב — כך שביד הבאה מול יריב מוכר ייטען הטווח האמיתי שלו במקום טווח גנרי. בקרוב."
     />
   );
 }

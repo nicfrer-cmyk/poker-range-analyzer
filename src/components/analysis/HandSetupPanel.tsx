@@ -7,6 +7,13 @@ import { CardPicker } from "@/components/cards/CardPicker";
 import { Button } from "@/components/ui/Button";
 import { useAnalysisStore, streetFromBoard } from "@/lib/store/analysisStore";
 
+const STREET_LABEL: Record<string, string> = {
+  preflop: "פרה-פלופ",
+  flop: "פלופ",
+  turn: "טרן",
+  river: "ריבר",
+};
+
 function NumberField({
   label,
   value,
@@ -30,42 +37,68 @@ function NumberField({
   );
 }
 
+type PickerTarget = { kind: "hero"; index: 0 | 1 } | { kind: "board"; indices: number[] };
+
 export function HandSetupPanel() {
   const { input, setHeroCard, setBoardCard, removeBoardCard, setField, usedCards, reset } =
     useAnalysisStore();
-  const [pickerTarget, setPickerTarget] = useState<
-    { kind: "hero"; index: 0 | 1 } | { kind: "board"; index: number } | null
-  >(null);
+  const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
   const used = usedCards();
-  const street = streetFromBoard(input.board.filter(Boolean));
+  const filledBoard = input.board.filter(Boolean);
+  const street = streetFromBoard(filledBoard);
 
   const pick = (card: string) => {
     if (!pickerTarget) return;
-    if (pickerTarget.kind === "hero") setHeroCard(pickerTarget.index, card);
-    else setBoardCard(pickerTarget.index, card);
-    setPickerTarget(null);
+    if (pickerTarget.kind === "hero") {
+      setHeroCard(pickerTarget.index, card);
+      setPickerTarget(null);
+      return;
+    }
+    const nextIndex = pickerTarget.indices.find((i) => !input.board[i]);
+    if (nextIndex === undefined) {
+      setPickerTarget(null);
+      return;
+    }
+    setBoardCard(nextIndex, card);
+    const remaining = pickerTarget.indices.filter((i) => i !== nextIndex && !input.board[i]);
+    setPickerTarget(remaining.length > 0 ? { kind: "board", indices: pickerTarget.indices } : null);
+  };
+
+  const openBoardPicker = () => {
+    const filledCount = filledBoard.length;
+    if (filledCount < 3) {
+      // Preflop → flop: pick all remaining flop cards in one continuous session
+      // (resumes correctly even if the picker was closed partway through).
+      setPickerTarget({ kind: "board", indices: [0, 1, 2] });
+    } else if (filledCount === 3) {
+      setPickerTarget({ kind: "board", indices: [3] }); // turn
+    } else if (filledCount === 4) {
+      setPickerTarget({ kind: "board", indices: [4] }); // river
+    }
   };
 
   const boardSlots = [0, 1, 2, 3, 4];
+  const remainingToPick =
+    pickerTarget?.kind === "board"
+      ? pickerTarget.indices.filter((i) => !input.board[i]).length
+      : 0;
 
   return (
     <Panel>
       <PanelHeader>
-        <PanelTitle>Hand Setup</PanelTitle>
+        <PanelTitle>הגדרת יד</PanelTitle>
         <Button size="sm" variant="ghost" onClick={reset}>
-          Reset
+          איפוס
         </Button>
       </PanelHeader>
       <PanelBody className="space-y-4">
         <div>
-          <p className="mb-1.5 text-xs text-base-muted">Hero cards</p>
+          <p className="mb-1.5 text-xs text-base-muted">הקלפים שלי</p>
           <div className="flex gap-2">
             {[0, 1].map((i) => (
               <button
                 key={i}
-                onClick={() =>
-                  setPickerTarget({ kind: "hero", index: i as 0 | 1 })
-                }
+                onClick={() => setPickerTarget({ kind: "hero", index: i as 0 | 1 })}
               >
                 <PlayingCard card={input.heroCards[i]} size="md" />
               </button>
@@ -75,40 +108,45 @@ export function HandSetupPanel() {
 
         <div>
           <p className="mb-1.5 text-xs text-base-muted">
-            Board ({street === "preflop" ? "preflop" : street})
+            הבורד ({STREET_LABEL[street]})
           </p>
           <div className="flex gap-2">
             {boardSlots.map((i) => {
-              const isNextEmpty =
-                i === input.board.filter(Boolean).length && i < 5;
               const filled = input.board[i];
-              if (!filled && !isNextEmpty)
+              const isNextGroupStart =
+                (i === 0 && filledBoard.length === 0) ||
+                (i === 3 && filledBoard.length === 3) ||
+                (i === 4 && filledBoard.length === 4);
+              if (!filled && !isNextGroupStart && !(i < 3 && filledBoard.length < 3))
                 return <div key={i} className="w-12" />;
               return (
                 <button
                   key={i}
-                  onClick={() =>
-                    filled
-                      ? removeBoardCard(i)
-                      : setPickerTarget({ kind: "board", index: i })
-                  }
-                  title={filled ? "Click to remove" : "Click to add"}
+                  onClick={() => (filled ? removeBoardCard(i) : openBoardPicker())}
+                  title={filled ? "לחץ להסרה" : "לחץ להוספה"}
                 >
                   <PlayingCard card={filled} size="md" faceDown={!filled} />
                 </button>
               );
             })}
           </div>
+          <p className="mt-1 text-[11px] text-base-muted/80">
+            לחיצה על הפלופ פותחת בחירה של 3 קלפים ברצף אחד.
+          </p>
         </div>
 
         {pickerTarget && (
           <div className="rounded-lg border border-base-border bg-base-panel2 p-3">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-xs text-base-muted">
-                Pick a card for {pickerTarget.kind === "hero" ? `hero card ${pickerTarget.index + 1}` : "the board"}
+                {pickerTarget.kind === "hero"
+                  ? `בחר קלף ליד שלי ${pickerTarget.index + 1}`
+                  : remainingToPick > 1
+                  ? `בחר ${remainingToPick} קלפים לבורד`
+                  : "בחר קלף לבורד"}
               </span>
               <Button size="sm" variant="ghost" onClick={() => setPickerTarget(null)}>
-                Close
+                סגור
               </Button>
             </div>
             <CardPicker usedCards={used} onPick={pick} />
@@ -116,15 +154,19 @@ export function HandSetupPanel() {
         )}
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <NumberField label="Pot" value={input.pot} onChange={(v) => setField("pot", v)} />
-          <NumberField label="To Call" value={input.toCall} onChange={(v) => setField("toCall", v)} />
+          <NumberField label="קופה" value={input.pot} onChange={(v) => setField("pot", v)} />
           <NumberField
-            label="Hero Stack"
+            label="סכום להשלמה"
+            value={input.toCall}
+            onChange={(v) => setField("toCall", v)}
+          />
+          <NumberField
+            label="הסטאק שלי"
             value={input.heroStack}
             onChange={(v) => setField("heroStack", v)}
           />
           <NumberField
-            label="Players in Hand"
+            label="שחקנים ביד"
             value={input.numPlayers}
             onChange={(v) => setField("numPlayers", Math.max(2, v))}
           />

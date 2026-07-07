@@ -3,9 +3,9 @@ import { ComingSoon } from "@/components/ui/ComingSoon";
 export default function RangeVsRangePage() {
   return (
     <ComingSoon
-      wave="Wave 3 — Depth (Pro)"
-      title="Range vs Range Equity"
-      description="Compare your entire range against the villain's entire range with a full equity distribution curve, range advantage, and nut advantage — not just a single hand's number. Coming soon."
+      wave="גל 3 — העמקה (פרו)"
+      title="אקוויטי טווח מול טווח"
+      description="השווה את כל הטווח שלך מול כל הטווח של היריב עם עקומת התפלגות אקוויטי מלאה, יתרון טווח ויתרון בקומבינציות העליונות — לא רק מספר של יד בודדת. בקרוב."
     />
   );
 }

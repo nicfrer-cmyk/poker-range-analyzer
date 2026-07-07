@@ -84,7 +84,7 @@ export function RangeBuilder({
   return (
     <Panel>
       <PanelHeader>
-        <PanelTitle>Villain Range</PanelTitle>
+        <PanelTitle>הטווח של היריב</PanelTitle>
       </PanelHeader>
       <PanelBody className="space-y-3">
         <div className="flex flex-wrap gap-1.5">
@@ -108,7 +108,7 @@ export function RangeBuilder({
             setManualLabels(null);
             onChange(e.target.value);
           }}
-          placeholder="e.g. 22+,ATs+,KQo"
+          placeholder="לדוגמה: 22+,ATs+,KQo"
           className="w-full rounded-lg border border-base-border bg-base-panel2 px-3 py-2 text-sm outline-none focus:border-accent"
         />
         <RangeMatrix selected={selected} onToggle={toggle} onTooltip={(l) => l} />

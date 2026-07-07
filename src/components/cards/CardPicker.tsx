@@ -43,7 +43,7 @@ export function CardPicker({
               >
                 <span className="leading-none">
                   {rank}
-                  <span className="ml-px">{suit.glyph}</span>
+                  <span className="ms-px">{suit.glyph}</span>
                 </span>
               </button>
             );

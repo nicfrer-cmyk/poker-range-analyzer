@@ -15,5 +15,6 @@ next-env.d.ts
 coverage/
 .turbo/
 *.tsbuildinfo
+.claude/
 android/
 ios/

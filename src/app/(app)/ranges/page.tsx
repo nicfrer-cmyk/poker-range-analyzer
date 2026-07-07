@@ -39,11 +39,11 @@ export default function RangeLibraryPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Range Library</h1>
+      <h1 className="text-2xl font-semibold">ספריית טווחים</h1>
 
       <Panel>
         <PanelHeader>
-          <PanelTitle>Preset Ranges</PanelTitle>
+          <PanelTitle>טווחים מוגדרים מראש</PanelTitle>
         </PanelHeader>
         <PanelBody className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {(Object.keys(PRESET_RANGES) as PresetRangeKey[]).map((key) => (
@@ -51,7 +51,7 @@ export default function RangeLibraryPage() {
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold">{PRESET_RANGES[key].label}</span>
                 <Button size="sm" variant="secondary" onClick={() => loadIntoAnalyzer(PRESET_RANGES[key].range)}>
-                  Use
+                  השתמש
                 </Button>
               </div>
               <RangeMatrix selected={rangeTextToLabels(PRESET_RANGES[key].range)} />
@@ -62,20 +62,20 @@ export default function RangeLibraryPage() {
 
       <Panel>
         <PanelHeader>
-          <PanelTitle>Your Saved Ranges</PanelTitle>
+          <PanelTitle>הטווחים השמורים שלך</PanelTitle>
         </PanelHeader>
         <PanelBody className="space-y-4">
           <div className="flex flex-wrap gap-2">
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Range name"
+              placeholder="שם הטווח"
               className="rounded-lg border border-base-border bg-base-panel2 px-2.5 py-1.5 text-sm outline-none focus:border-accent"
             />
             <input
               value={newCombos}
               onChange={(e) => setNewCombos(e.target.value)}
-              placeholder="e.g. 22+,ATs+,KQo"
+              placeholder="לדוגמה: 22+,ATs+,KQo"
               className="flex-1 rounded-lg border border-base-border bg-base-panel2 px-2.5 py-1.5 text-sm outline-none focus:border-accent"
             />
             <Button
@@ -88,11 +88,11 @@ export default function RangeLibraryPage() {
                 setNewCombos("");
               }}
             >
-              Save Range
+              שמירת טווח
             </Button>
           </div>
           {customRanges.length === 0 ? (
-            <p className="text-sm text-base-muted">No custom ranges saved yet.</p>
+            <p className="text-sm text-base-muted">עדיין אין טווחים מותאמים אישית שמורים.</p>
           ) : (
             customRanges.map((r) => (
               <div key={r.id} className="flex items-center justify-between rounded-lg border border-base-border p-3">
@@ -102,7 +102,7 @@ export default function RangeLibraryPage() {
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" variant="secondary" onClick={() => loadIntoAnalyzer(r.combos)}>
-                    Use
+                    השתמש
                   </Button>
                   <Button
                     size="sm"
@@ -112,7 +112,7 @@ export default function RangeLibraryPage() {
                       setCustomRanges(listRanges());
                     }}
                   >
-                    Delete
+                    מחיקה
                   </Button>
                 </div>
               </div>

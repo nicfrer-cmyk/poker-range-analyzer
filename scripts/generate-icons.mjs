@@ -52,9 +52,9 @@ function makePng(size, [r, g, b], accentHex) {
       const dy = y - cy * 0.95;
       const inSpade = dx * dx + dy * dy < radius * radius;
       if (inSpade) {
-        raw[idx] = 232;
-        raw[idx + 1] = 234;
-        raw[idx + 2] = 237;
+        raw[idx] = 255;
+        raw[idx + 1] = 255;
+        raw[idx + 2] = 255;
       } else {
         raw[idx] = r;
         raw[idx + 1] = g;
@@ -74,7 +74,7 @@ function makePng(size, [r, g, b], accentHex) {
 }
 
 mkdirSync("public/icons", { recursive: true });
-const bg = [10, 12, 16]; // #0A0C10
+const bg = [91, 91, 224]; // #5B5BE0 accent purple — icons keep a colored mark for home-screen visibility even though the in-app theme is white
 for (const size of [192, 512]) {
   writeFileSync(`public/icons/icon-${size}.png`, makePng(size, bg));
 }

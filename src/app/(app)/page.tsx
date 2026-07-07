@@ -8,6 +8,32 @@ import { Button } from "@/components/ui/Button";
 import { PlayingCard } from "@/components/cards/PlayingCard";
 import { listHands, type StoredHand } from "@/lib/localHandStore";
 import { computeSessionStats, topLeaks } from "@/lib/engine/leakFinder";
+import { MADE_TIER_LABEL } from "@/lib/labels";
+
+const STREET_LABEL: Record<string, string> = {
+  preflop: "פרה-פלופ",
+  flop: "פלופ",
+  turn: "טרן",
+  river: "ריבר",
+};
+
+const DIMENSION_LABEL: Record<string, string> = {
+  position: "פוזיציה",
+  handCategory: "קטגוריית יד",
+  street: "רחוב",
+  potSizeBucket: "גודל הפוט",
+};
+
+function formatLeakKey(dimension: string, key: string): string {
+  if (dimension === "handCategory") {
+    return MADE_TIER_LABEL[key as keyof typeof MADE_TIER_LABEL] ?? key;
+  }
+  if (dimension === "street") return STREET_LABEL[key] ?? key;
+  if (dimension === "potSizeBucket") {
+    return key.replace("small", "נמוך").replace("medium", "בינוני").replace("large", "גבוה");
+  }
+  return key;
+}
 
 export default function DashboardPage() {
   const [hands, setHands] = useState<StoredHand[]>([]);
@@ -23,32 +49,31 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Welcome back</h1>
+        <h1 className="text-2xl font-semibold">ברוך שובך</h1>
         <p className="mt-1 text-sm text-base-muted">
-          Post-game analysis only — pick a hand, see where you stood, and learn what to do
-          differently next time.
+          ניתוח לאחר המשחק בלבד — בחר יד, ראה איפה עמדת, ולמד מה לעשות אחרת בפעם הבאה.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-3">
         <Link href="/analyze">
-          <Button>New Analysis</Button>
+          <Button>ניתוח חדש</Button>
         </Link>
         <Link href="/hands/import">
-          <Button variant="secondary">Import Hand History</Button>
+          <Button variant="secondary">ייבוא היסטוריית ידיים</Button>
         </Link>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Panel>
           <PanelBody>
-            <p className="text-xs text-base-muted">Hands analyzed</p>
+            <p className="text-xs text-base-muted">ידיים שנותחו</p>
             <p className="text-2xl font-bold">{stats.handCount}</p>
           </PanelBody>
         </Panel>
         <Panel>
           <PanelBody>
-            <p className="text-xs text-base-muted">Avg equity</p>
+            <p className="text-xs text-base-muted">אקוויטי ממוצע</p>
             <p className="text-2xl font-bold">
               {stats.handCount ? `${(stats.avgEquity * 100).toFixed(1)}%` : "—"}
             </p>
@@ -56,7 +81,7 @@ export default function DashboardPage() {
         </Panel>
         <Panel>
           <PanelBody>
-            <p className="text-xs text-base-muted">Good decisions</p>
+            <p className="text-xs text-base-muted">החלטות טובות</p>
             <p className="text-2xl font-bold text-status-ahead">
               {stats.handCount ? `${(stats.goodDecisionRate * 100).toFixed(0)}%` : "—"}
             </p>
@@ -64,7 +89,7 @@ export default function DashboardPage() {
         </Panel>
         <Panel>
           <PanelBody>
-            <p className="text-xs text-base-muted">Top leaks found</p>
+            <p className="text-xs text-base-muted">דליפות מובילות שנמצאו</p>
             <p className="text-2xl font-bold text-status-behind">{leaks.length}</p>
           </PanelBody>
         </Panel>
@@ -73,14 +98,14 @@ export default function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel>
           <PanelHeader>
-            <PanelTitle>Recent Analyses</PanelTitle>
+            <PanelTitle>ניתוחים אחרונים</PanelTitle>
             <Link href="/hands" className="text-xs text-accent-soft">
-              View all
+              לכל הידיים
             </Link>
           </PanelHeader>
           <PanelBody className="space-y-3">
             {recent.length === 0 ? (
-              <p className="text-sm text-base-muted">No hands yet — run your first analysis.</p>
+              <p className="text-sm text-base-muted">עדיין אין ידיים — הרץ את הניתוח הראשון שלך.</p>
             ) : (
               recent.map((h) => (
                 <div key={h.id} className="flex items-center gap-3">
@@ -93,7 +118,8 @@ export default function DashboardPage() {
                     {(h.equityAtDecision * 100).toFixed(0)}%
                   </Badge>
                   <span className="text-xs text-base-muted">
-                    {h.handCategory?.replace(/-/g, " ")} · {h.street}
+                    {h.handCategory ? formatLeakKey("handCategory", h.handCategory) : "—"} ·{" "}
+                    {STREET_LABEL[h.street] ?? h.street}
                   </span>
                 </div>
               ))
@@ -103,15 +129,15 @@ export default function DashboardPage() {
 
         <Panel>
           <PanelHeader>
-            <PanelTitle>Top Leaks</PanelTitle>
+            <PanelTitle>דליפות מובילות</PanelTitle>
             <Link href="/session" className="text-xs text-accent-soft">
-              Full report
+              דוח מלא
             </Link>
           </PanelHeader>
           <PanelBody className="space-y-2">
             {leaks.length === 0 ? (
               <p className="text-sm text-base-muted">
-                Save a few more hands to unlock leak detection.
+                שמור עוד כמה ידיים כדי לפתוח את גילוי הדליפות.
               </p>
             ) : (
               leaks.map((leak) => (
@@ -120,9 +146,10 @@ export default function DashboardPage() {
                   className="flex items-center justify-between rounded-lg border border-base-border px-3 py-2"
                 >
                   <span className="text-sm">
-                    {leak.dimension}: <b>{leak.key}</b>
+                    {DIMENSION_LABEL[leak.dimension] ?? leak.dimension}:{" "}
+                    <b>{formatLeakKey(leak.dimension, leak.key)}</b>
                   </span>
-                  <span className="text-xs text-base-muted">{leak.count} hands</span>
+                  <span className="text-xs text-base-muted">{leak.count} ידיים</span>
                 </div>
               ))
             )}
@@ -132,14 +159,14 @@ export default function DashboardPage() {
 
       <Panel>
         <PanelHeader>
-          <PanelTitle>More Tools</PanelTitle>
+          <PanelTitle>כלים נוספים</PanelTitle>
         </PanelHeader>
         <PanelBody className="flex flex-wrap gap-2">
           {[
-            { href: "/range-vs-range", label: "Range vs Range" },
-            { href: "/icm", label: "ICM Calculator" },
-            { href: "/ai-review", label: "AI Hand Review" },
-            { href: "/bankroll", label: "Bankroll Tracker" },
+            { href: "/range-vs-range", label: "טווח מול טווח" },
+            { href: "/icm", label: "מחשבון ICM" },
+            { href: "/ai-review", label: "ניתוח יד עם AI" },
+            { href: "/bankroll", label: "מעקב בנקרול" },
           ].map((tool) => (
             <Link key={tool.href} href={tool.href}>
               <Button variant="secondary" size="sm">

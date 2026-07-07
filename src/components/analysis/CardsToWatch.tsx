@@ -32,15 +32,15 @@ export function CardsToWatch({
   return (
     <Panel>
       <PanelHeader>
-        <PanelTitle>Cards to Watch For</PanelTitle>
+        <PanelTitle>קלפים לצפות להם</PanelTitle>
       </PanelHeader>
       <PanelBody className="space-y-4">
         <div>
-          <p className="mb-2 text-xs font-medium text-status-ahead">Best next cards</p>
+          <p className="mb-2 text-xs font-medium text-status-ahead">הקלפים הטובים ביותר</p>
           <Row items={best} positive />
         </div>
         <div>
-          <p className="mb-2 text-xs font-medium text-status-behind">Most dangerous cards</p>
+          <p className="mb-2 text-xs font-medium text-status-behind">הקלפים המסוכנים ביותר</p>
           <Row items={worst} positive={false} />
         </div>
       </PanelBody>

@@ -11,28 +11,28 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Settings</h1>
+      <h1 className="text-2xl font-semibold">הגדרות</h1>
 
       <Panel>
         <PanelHeader>
-          <PanelTitle>Plan</PanelTitle>
-          <Badge tone={plan === "PRO" ? "ahead" : "neutral"}>{plan}</Badge>
+          <PanelTitle>תוכנית</PanelTitle>
+          <Badge tone={plan === "PRO" ? "ahead" : "neutral"}>{plan === "PRO" ? "פרו" : "חינמי"}</Badge>
         </PanelHeader>
         <PanelBody className="space-y-3">
           <p className="text-sm text-base-muted">
-            Until real billing is connected, use this switch to preview Free vs Pro gating
-            locally.
+            עד שהחיוב האמיתי יחובר, אפשר להשתמש במתג הזה כדי להדגים באופן מקומי את ההבדל בין
+            חינמי לפרו.
           </p>
           <div className="flex gap-2">
             <Button variant={plan === "FREE" ? "primary" : "secondary"} size="sm" onClick={() => setPlan("FREE")}>
-              Free
+              חינמי
             </Button>
             <Button variant={plan === "PRO" ? "primary" : "secondary"} size="sm" onClick={() => setPlan("PRO")}>
-              Pro
+              פרו
             </Button>
             <Link href="/billing">
               <Button variant="ghost" size="sm">
-                Manage subscription →
+                ניהול המנוי ←
               </Button>
             </Link>
           </div>
@@ -41,13 +41,13 @@ export default function SettingsPage() {
 
       <Panel>
         <PanelHeader>
-          <PanelTitle>About this product</PanelTitle>
+          <PanelTitle>על המוצר</PanelTitle>
         </PanelHeader>
         <PanelBody className="space-y-2 text-sm text-base-muted">
-          <p>Post-game analysis only — there is no live-play assistance in this product, by design.</p>
+          <p>ניתוח לאחר המשחק בלבד — אין בכלי הזה סיוע בזמן אמת במשחק, בכוונה תחילה.</p>
           <p>
-            All hand data you save is stored locally in this browser until you connect a
-            Supabase project (see the project ROADMAP for setup steps).
+            כל נתוני הידיים שאתה שומר מאוחסנים מקומית בדפדפן הזה, עד שתחבר פרויקט Supabase (ראה
+            את מסמך ה-ROADMAP של הפרויקט לשלבי ההתקנה).
           </p>
         </PanelBody>
       </Panel>

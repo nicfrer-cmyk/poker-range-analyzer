@@ -14,6 +14,7 @@ import type {
   BlockerInfo,
 } from "@/lib/analysisTypes";
 import { equityTone, type StatusTone } from "@/lib/statusTone";
+import { MADE_TIER_LABEL, drawsToHebrew } from "@/lib/labels";
 
 const VALUE_TIERS = new Set<MadeTier>([
   "straight-flush",
@@ -36,7 +37,7 @@ function toneFromDanger(level: number): StatusTone {
 }
 
 function describeBoardTexture(board: Card[]): { text: string; danger: StatusTone } {
-  if (board.length === 0) return { text: "No board yet — preflop.", danger: "ahead" };
+  if (board.length === 0) return { text: "אין עדיין בורד — פרה-פלופ.", danger: "ahead" };
 
   const ranks = board.map((c) => rankValue(cardRank(c)));
   const suits = board.map((c) => cardSuit(c));
@@ -52,35 +53,35 @@ function describeBoardTexture(board: Card[]): { text: string; danger: StatusTone
   let danger = 1;
   const notes: string[] = [];
   if (maxSuitCount >= 3) {
-    notes.push("three-flush texture");
+    notes.push("טקסטורת שלוש-פלאש");
     danger += 2;
   } else if (maxSuitCount === 2) {
-    notes.push("two-tone");
+    notes.push("דו-גוני");
     danger += 1;
   } else {
-    notes.push("rainbow");
+    notes.push("ריינבו");
   }
   if (paired) {
-    notes.push("paired board");
+    notes.push("בורד זוגי");
     danger += 1;
   }
   if (connected) {
-    notes.push("connected, straight-draw heavy");
+    notes.push("מחובר, עתיר דרואים לסטרייט");
     danger += 1;
   }
   const highCard = Math.max(...ranks);
-  if (highCard >= rankValue("Q")) notes.push("high-card board");
+  if (highCard >= rankValue("Q")) notes.push("בורד עם קלפים גבוהים");
 
-  return { text: `Board texture: ${notes.join(", ")}.`, danger: toneFromDanger(danger) };
+  return { text: `טקסטורת הבורד: ${notes.join(", ")}.`, danger: toneFromDanger(danger) };
 }
 
 function verdictFromEquity(pct: number): { text: string; tone: StatusTone } {
   const tone = equityTone(pct);
-  if (tone === "crushing") return { text: "You're a massive favorite here.", tone };
-  if (tone === "ahead") return { text: "You're ahead in this spot.", tone };
-  if (tone === "close") return { text: "This is a coinflip — razor close.", tone };
-  if (tone === "risky") return { text: "You're behind, but not drawing dead.", tone };
-  return { text: "You're a significant underdog here.", tone };
+  if (tone === "crushing") return { text: "אתה פייבוריט ענק במצב הזה.", tone };
+  if (tone === "ahead") return { text: "אתה מוביל במצב הזה.", tone };
+  if (tone === "close") return { text: "זה מטבע באוויר — צמוד מאוד.", tone };
+  if (tone === "risky") return { text: "אתה מאחור, אבל לא הולך למוות.", tone };
+  return { text: "אתה אנדרדוג משמעותי במצב הזה.", tone };
 }
 
 function outsFromDraws(draws: string[]): number {
@@ -177,10 +178,10 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult | null {
   const sprValue = toCall > 0 ? input.heroStack / (pot + toCall) : input.heroStack / Math.max(pot, 1);
   const sprInterpretation =
     sprValue < 3
-      ? "Low SPR — this hand is heading toward stacks, play for commitment."
+      ? "SPR נמוך — היד הזו בדרך להכנסת כל הצ'יפים, שחק להתחייבות."
       : sprValue < 6
-      ? "Medium SPR — there's room to maneuver postflop."
-      : "High SPR — deep relative to the pot, play cautiously without a strong hand.";
+      ? "SPR בינוני — יש מקום לתמרון אחרי הפלופ."
+      : "SPR גבוה — עמוק ביחס לקופה, שחק בזהירות בלי יד חזקה.";
 
   const rangeComposition = bucketRangeComposition(entries, board);
   const blockers = computeBlockers(heroCards, rawEntries, board);
@@ -188,13 +189,13 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult | null {
   const keyInsights: Insight[] = [];
   keyInsights.push({
     id: "equity",
-    text: `Your ${classification.description.toLowerCase()} has ${heroEquityPct.toFixed(1)}% equity against this range.`,
+    text: `ה${MADE_TIER_LABEL[classification.madeTier]} שלך עומד על ${heroEquityPct.toFixed(1)}% אקוויטי מול הטווח הזה.`,
     tone: verdictTone,
   });
   if (classification.draws.length > 0) {
     keyInsights.push({
       id: "draw",
-      text: `You also hold a live draw (${classification.draws.join(", ").replace(/-/g, " ")}) worth roughly ${outs} outs.`,
+      text: `יש לך גם דרואו חי (${drawsToHebrew(classification.draws)}) בשווי של כ-${outs} אאוטים.`,
       tone: "close",
     });
   }
@@ -202,21 +203,21 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult | null {
   if (topBucket) {
     keyInsights.push({
       id: "range-top",
-      text: `The villain's range is mostly ${topBucket.category.replace(/-/g, " ")} (${(topBucket.weight * 100).toFixed(0)}% of combos).`,
+      text: `הטווח של היריב מורכב בעיקר מ${MADE_TIER_LABEL[topBucket.category as MadeTier] ?? topBucket.category} (${(topBucket.weight * 100).toFixed(0)}% מהקומבינציות).`,
       tone: "neutral",
     });
   }
   keyInsights.push({
     id: "pot-odds",
     text: callProfitable
-      ? `Calling is profitable: you need ${requiredEquityPct.toFixed(1)}% equity and have ${heroEquityPct.toFixed(1)}%.`
-      : `Calling loses value here: you need ${requiredEquityPct.toFixed(1)}% equity but only have ${heroEquityPct.toFixed(1)}%.`,
+      ? `קול משתלם כאן: אתה צריך ${requiredEquityPct.toFixed(1)}% אקוויטי ויש לך ${heroEquityPct.toFixed(1)}%.`
+      : `קול מפסיד ערך כאן: אתה צריך ${requiredEquityPct.toFixed(1)}% אקוויטי אבל יש לך רק ${heroEquityPct.toFixed(1)}%.`,
     tone: callProfitable ? "ahead" : "behind",
   });
   if (input.numPlayers > 2) {
     keyInsights.push({
       id: "multiway",
-      text: `With ${input.numPlayers} players still in, your realistic equity share drops to about ${multiwayAdjustedEquityPct.toFixed(1)}%.`,
+      text: `עם ${input.numPlayers} שחקנים עדיין ביד, נתח האקוויטי הריאלי שלך יורד לכ-${multiwayAdjustedEquityPct.toFixed(1)}%.`,
       tone: "risky",
     });
   }
@@ -225,7 +226,7 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult | null {
   if (street !== "preflop") {
     whatChanged.push(boardTexture);
     if (classification.draws.length > 0) {
-      whatChanged.push(`On this street you picked up: ${classification.draws.join(", ").replace(/-/g, " ")}.`);
+      whatChanged.push(`ברחוב הזה קיבלת: ${drawsToHebrew(classification.draws)}.`);
     }
   }
 
@@ -238,17 +239,17 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult | null {
   const coachMessages: string[] = [];
   coachMessages.push(verdictText);
   if (street === "preflop") {
-    coachMessages.push("This is a preflop equity snapshot — postflop play will depend heavily on board texture.");
+    coachMessages.push("זו תמונת מצב של אקוויטי פרה-פלופ — המשחק אחרי הפלופ יהיה תלוי מאוד בטקסטורת הבורד.");
   } else {
     coachMessages.push(boardTexture);
   }
   coachMessages.push(
     callProfitable
-      ? "Facing this bet, a call clears the required equity threshold."
-      : "Facing this bet, folding loses less than a call in the long run — unless you have strong implied odds or fold equity to consider."
+      ? "מול ההימור הזה, קול עובר את סף האקוויטי הנדרש."
+      : "מול ההימור הזה, פולד מפסיד פחות מקול בטווח הארוך — אלא אם יש לך אימפלייד אודס טובים או פולד אקוויטי לקחת בחשבון."
   );
   if (classification.draws.length > 0) {
-    coachMessages.push("Remember: your draw's value depends on getting paid when you hit, not just hitting.");
+    coachMessages.push("זכור: הערך של הדרואו שלך תלוי בכך שתקבל תשלום כשתפגע, לא רק בפגיעה עצמה.");
   }
 
   return {

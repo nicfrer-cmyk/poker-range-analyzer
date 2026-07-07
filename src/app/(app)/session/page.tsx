@@ -13,12 +13,12 @@ export default function SessionReviewPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Session Review &amp; Leak Finder</h1>
+      <h1 className="text-2xl font-semibold">סקירת סשן וגילוי דליפות</h1>
       {!gate.allowed ? (
         <ComingSoon
-          wave="Pro feature"
-          title="Unlock Leak Finder with Pro"
-          description={gate.reason ?? "This feature requires Pro."}
+          wave="תכונת פרו"
+          title="פתח את גילוי הדליפות עם פרו"
+          description={gate.reason ?? "התכונה הזו דורשת מנוי פרו."}
         />
       ) : (
         <SessionDashboard />
@@ -26,7 +26,7 @@ export default function SessionReviewPage() {
       {!gate.allowed && (
         <div className="flex justify-center">
           <Link href="/billing">
-            <Button>Upgrade to Pro</Button>
+            <Button>שדרוג לפרו</Button>
           </Link>
         </div>
       )}

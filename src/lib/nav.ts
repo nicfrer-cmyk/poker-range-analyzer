@@ -6,13 +6,14 @@ export type NavItem = {
 };
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: "home", mobile: true },
-  { href: "/analyze", label: "New Analysis", icon: "spade", mobile: true },
-  { href: "/hands", label: "Hand Library", icon: "book", mobile: true },
-  { href: "/session", label: "Session Review", icon: "chart", mobile: true },
-  { href: "/training", label: "Training", icon: "target" },
-  { href: "/ranges", label: "Range Library", icon: "grid" },
-  { href: "/opponents", label: "Opponents", icon: "users" },
-  { href: "/billing", label: "Subscription", icon: "star" },
-  { href: "/settings", label: "Settings", icon: "gear", mobile: true },
+  { href: "/", label: "בית", icon: "home", mobile: true },
+  { href: "/analyze", label: "ניתוח חדש", icon: "spade", mobile: true },
+  { href: "/hands", label: "ספריית ידיים", icon: "book", mobile: true },
+  { href: "/leaderboard", label: "אתגרים", icon: "trophy", mobile: true },
+  { href: "/session", label: "סקירת סשן", icon: "chart" },
+  { href: "/training", label: "אימון", icon: "target" },
+  { href: "/ranges", label: "ספריית טווחים", icon: "grid" },
+  { href: "/opponents", label: "יריבים", icon: "users" },
+  { href: "/billing", label: "מנוי", icon: "star" },
+  { href: "/settings", label: "הגדרות", icon: "gear", mobile: true },
 ];

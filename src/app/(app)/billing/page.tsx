@@ -61,16 +61,16 @@ async function upgradeToPro(interval: BillingInterval) {
     if (res.ok && body.url) {
       successUrl = body.url;
     } else {
-      errorMessage = body.error ?? `Checkout failed with status ${res.status}.`;
+      errorMessage = body.error ?? `התשלום נכשל (קוד ${res.status}).`;
     }
   } catch {
-    errorMessage = "Unexpected error starting checkout.";
+    errorMessage = "אירעה שגיאה לא צפויה בעת פתיחת התשלום.";
   }
 
   if (successUrl) {
     redirect(successUrl);
   }
-  redirect(`/billing?checkout=error&message=${encodeURIComponent(errorMessage ?? "Checkout failed.")}`);
+  redirect(`/billing?checkout=error&message=${encodeURIComponent(errorMessage ?? "התשלום נכשל.")}`);
 }
 
 const upgradeMonthly = upgradeToPro.bind(null, "monthly");
@@ -123,15 +123,15 @@ export default async function BillingPage({
 
   return (
     <div className="mx-auto max-w-4xl p-6">
-      <h1 className="mb-2 text-2xl font-semibold">Billing</h1>
+      <h1 className="mb-2 text-2xl font-semibold">מנוי וחיוב</h1>
       <p className="mb-6 text-sm opacity-75">
-        Poker Range Analyzer — Free vs Pro plans.
+        מנתח טווחי פוקר — תוכנית חינמית מול פרו.
       </p>
 
       {configError && (
         <div className="mb-6 rounded-2xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm">
-          Supabase isn&apos;t configured yet, so we can&apos;t show your account or
-          let you check out. ({configError})
+          Supabase עדיין לא מוגדר, ולכן לא ניתן להציג את החשבון שלך או לבצע
+          תשלום. ({configError})
         </div>
       )}
 
@@ -142,23 +142,23 @@ export default async function BillingPage({
       )}
       {checkoutCancelled && (
         <div className="mb-6 rounded-2xl border border-white/20 bg-white/5 p-4 text-sm">
-          Checkout was cancelled — no changes were made.
+          התשלום בוטל — לא בוצע שום שינוי.
         </div>
       )}
       {checkoutSuccess && (
         <div className="mb-6 rounded-2xl border border-green-500/40 bg-green-500/10 p-4 text-sm">
-          Thanks! Your subscription is being set up — this page will reflect
-          Pro access once Stripe confirms the payment.
+          תודה! המנוי שלך בתהליך הקמה — הדף הזה יציג גישת פרו ברגע ש-Stripe
+          יאשר את התשלום.
         </div>
       )}
 
       {subscription && (
         <div className="mb-8 rounded-2xl border border-white/20 p-4 text-sm">
-          Signed in as <span className="font-medium">{email}</span> — current
-          plan: <span className="font-medium">{subscription.plan}</span> (
+          מחובר בתור <span className="font-medium">{email}</span> — תוכנית
+          נוכחית: <span className="font-medium">{subscription.plan}</span> (
           {subscription.status}
           {subscription.currentPeriodEnd
-            ? `, renews ${subscription.currentPeriodEnd.toLocaleDateString()}`
+            ? `, מתחדש בתאריך ${subscription.currentPeriodEnd.toLocaleDateString("he-IL")}`
             : ""}
           )
         </div>
@@ -167,56 +167,56 @@ export default async function BillingPage({
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Free plan */}
         <div className="rounded-2xl border border-white/20 p-6">
-          <h2 className="text-lg font-semibold">Free</h2>
+          <h2 className="text-lg font-semibold">חינמי</h2>
           <p className="mt-1 text-3xl font-bold">$0</p>
           <ul className="mt-4 space-y-2 text-sm opacity-90">
-            <li>{PLAN_LIMITS.FREE.dailyAnalysisLimit} hand analyses / day</li>
-            <li>Up to {PLAN_LIMITS.FREE.maxSavedHands} saved analyses</li>
-            <li>Preset ranges + basic manual range building</li>
-            <li>Hero Summary + coach</li>
-            <li>Pot odds / SPR / EV calculations</li>
-            <li>{PLAN_LIMITS.FREE.dailyImportLimit} hand history imports / day (no bulk)</li>
-            <li className="opacity-60">Leak finder &amp; session review — not included</li>
-            <li>Basic training mode</li>
-            <li className="opacity-60">Range vs. range — not included</li>
-            <li className="opacity-60">ICM calculator — not included</li>
-            <li>{PLAN_LIMITS.FREE.dailyAiReviewLimit} AI hand review / day</li>
-            <li>Up to {PLAN_LIMITS.FREE.maxOpponentProfiles} opponent profiles</li>
-            <li className="opacity-60">Data export — not included</li>
-            <li>Regular support</li>
+            <li>{PLAN_LIMITS.FREE.dailyAnalysisLimit} ניתוחי ידיים ביום</li>
+            <li>עד {PLAN_LIMITS.FREE.maxSavedHands} ניתוחים שמורים</li>
+            <li>טווחים מוגדרים מראש + בנייה ידנית בסיסית של טווחים</li>
+            <li>סיכום יד + מאמן</li>
+            <li>חישובי פוט אודס / SPR / EV</li>
+            <li>{PLAN_LIMITS.FREE.dailyImportLimit} ייבואי היסטוריית יד ביום (ללא ייבוא מרובה)</li>
+            <li className="opacity-60">גילוי דליפות וסקירת סשן — לא כלול</li>
+            <li>מצב אימון בסיסי</li>
+            <li className="opacity-60">טווח מול טווח — לא כלול</li>
+            <li className="opacity-60">מחשבון ICM — לא כלול</li>
+            <li>{PLAN_LIMITS.FREE.dailyAiReviewLimit} ניתוחי AI ליד ביום</li>
+            <li>עד {PLAN_LIMITS.FREE.maxOpponentProfiles} פרופילי יריבים</li>
+            <li className="opacity-60">ייצוא נתונים — לא כלול</li>
+            <li>תמיכה רגילה</li>
           </ul>
         </div>
 
         {/* Pro plan */}
         <div className="rounded-2xl border border-white/40 p-6">
-          <h2 className="text-lg font-semibold">Pro</h2>
+          <h2 className="text-lg font-semibold">פרו</h2>
           <p className="mt-1 text-3xl font-bold">
             ${PRO_PRICING.monthly.amountUsd}
-            <span className="text-base font-normal opacity-70">/mo</span>
+            <span className="text-base font-normal opacity-70">/לחודש</span>
           </p>
           <p className="text-xs opacity-60">
-            or ${PRO_PRICING.annual.amountUsd}/yr (
-            {PRO_PRICING.annual.discountPercentVsMonthly}% off) — placeholder
-            pricing pending market research
+            או ${PRO_PRICING.annual.amountUsd}/לשנה (הנחה של{" "}
+            {PRO_PRICING.annual.discountPercentVsMonthly}%) — מחיר זמני, בהמתנה
+            למחקר שוק
           </p>
           <ul className="mt-4 space-y-2 text-sm opacity-90">
-            <li>Unlimited hand analyses</li>
-            <li>Unlimited saved analyses</li>
-            <li>Advanced range building with unlimited saves</li>
-            <li>Unlimited hand history import, incl. bulk import</li>
-            <li>Full leak finder + session review</li>
-            <li>Full training mode + tracks</li>
-            <li>Range vs. range analysis</li>
-            <li>ICM calculator</li>
-            <li>Unlimited AI hand review</li>
-            <li>Unlimited opponent profiles</li>
-            <li>Data export</li>
-            <li>Priority support</li>
+            <li>ניתוחי ידיים ללא הגבלה</li>
+            <li>ניתוחים שמורים ללא הגבלה</li>
+            <li>בניית טווחים מתקדמת עם שמירה ללא הגבלה</li>
+            <li>ייבוא היסטוריית יד ללא הגבלה, כולל ייבוא מרובה</li>
+            <li>גילוי דליפות וסקירת סשן מלאים</li>
+            <li>מצב אימון מלא ומסלולי לימוד</li>
+            <li>ניתוח טווח מול טווח</li>
+            <li>מחשבון ICM</li>
+            <li>ניתוחי AI ליד ללא הגבלה</li>
+            <li>פרופילי יריבים ללא הגבלה</li>
+            <li>ייצוא נתונים</li>
+            <li>תמיכה מועדפת</li>
           </ul>
 
           {subscription?.plan === "PRO" ? (
             <div className="mt-6 rounded-xl border border-green-500/40 bg-green-500/10 p-3 text-center text-sm">
-              You&apos;re on Pro
+              יש לך מנוי פרו פעיל
             </div>
           ) : (
             <div className="mt-6 space-y-2">
@@ -226,7 +226,7 @@ export default async function BillingPage({
                   disabled={Boolean(configError)}
                   className="w-full rounded-xl border border-white/40 p-3 text-sm font-medium hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Upgrade to Pro — Monthly (${PRO_PRICING.monthly.amountUsd}/mo)
+                  שדרוג לפרו — חודשי (${PRO_PRICING.monthly.amountUsd}/לחודש)
                 </button>
               </form>
               <form action={upgradeAnnual}>
@@ -235,7 +235,7 @@ export default async function BillingPage({
                   disabled={Boolean(configError)}
                   className="w-full rounded-xl border border-white/40 p-3 text-sm font-medium hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Upgrade to Pro — Annual (${PRO_PRICING.annual.amountUsd}/yr)
+                  שדרוג לפרו — שנתי (${PRO_PRICING.annual.amountUsd}/לשנה)
                 </button>
               </form>
             </div>

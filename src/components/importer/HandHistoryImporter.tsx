@@ -24,7 +24,7 @@ export function HandHistoryImporter() {
   const handleParse = () => {
     const gate = canPerformAction(plan, "importHand", getTodayCount("import"));
     if (!gate.allowed) {
-      setGateMessage(gate.reason ?? "Import limit reached.");
+      setGateMessage(gate.reason ?? "הגעת למגבלת הייבוא היומית.");
       return;
     }
     setGateMessage(null);
@@ -36,7 +36,7 @@ export function HandHistoryImporter() {
     if (!files || files.length === 0) return;
     const bulkGate = canPerformAction(plan, "bulkImportHands");
     if (files.length > 1 && !bulkGate.allowed) {
-      setGateMessage(bulkGate.reason ?? "Bulk import requires Pro.");
+      setGateMessage(bulkGate.reason ?? "ייבוא מרובה זמין רק במנוי פרו.");
       return;
     }
     const contents = await Promise.all(Array.from(files).map((f) => f.text()));
@@ -66,16 +66,16 @@ export function HandHistoryImporter() {
           <PanelBody className="flex flex-wrap items-center justify-between gap-3 py-3">
             <span className="text-sm text-status-risky">{gateMessage}</span>
             <a href="/billing">
-              <Button size="sm">Upgrade to Pro</Button>
+              <Button size="sm">שדרוג לפרו</Button>
             </a>
           </PanelBody>
         </Panel>
       )}
       <Panel>
         <PanelHeader>
-          <PanelTitle>Paste Hand History</PanelTitle>
+          <PanelTitle>הדבקת היסטוריית יד</PanelTitle>
           <Button size="sm" variant="ghost" onClick={() => setShowScreenshotStub(true)}>
-            Analyze from Screenshot
+            ניתוח מצילום מסך
           </Button>
         </PanelHeader>
         <PanelBody className="space-y-3">
@@ -83,13 +83,13 @@ export function HandHistoryImporter() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={10}
-            placeholder="Paste one or many raw hand histories here (PokerStars / GGPoker / ClubGG style)…"
+            placeholder="הדבק כאן היסטוריית יד אחת או כמה (בפורמט PokerStars / GGPoker / ClubGG)…"
             className="w-full rounded-lg border border-base-border bg-base-panel2 p-3 font-mono text-xs outline-none focus:border-accent"
           />
           <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={handleParse}>Parse</Button>
+            <Button onClick={handleParse}>פענוח</Button>
             <label className="cursor-pointer text-xs text-accent-soft underline">
-              Upload file(s)
+              העלאת קובץ(ים)
               <input
                 type="file"
                 multiple
@@ -99,7 +99,7 @@ export function HandHistoryImporter() {
               />
             </label>
             <span className="text-xs text-base-muted">
-              Bulk import — paste multiple hands separated by blank lines.
+              ייבוא מרובה — הדבק כמה ידיים, כל אחת מופרדת בשורה ריקה.
             </span>
           </div>
         </PanelBody>
@@ -108,14 +108,14 @@ export function HandHistoryImporter() {
       {showScreenshotStub && (
         <Panel>
           <PanelBody className="space-y-2 py-6 text-center">
-            <Badge tone="neutral">Coming soon</Badge>
+            <Badge tone="neutral">בקרוב</Badge>
             <p className="text-sm text-base-muted">
-              Screenshot analysis needs a vision model to read cards off an image. This entry
-              point is wired up and ready — connect a vision API to enable it. For now, paste
-              the hand history text above instead.
+              ניתוח מצילום מסך דורש מודל ראייה שיודע לזהות קלפים מתוך תמונה. נקודת הכניסה הזו כבר
+              מוכנה — צריך רק לחבר API של ראייה כדי להפעיל אותה. בינתיים, הדבק את טקסט היסטוריית
+              היד למעלה.
             </p>
             <Button size="sm" variant="ghost" onClick={() => setShowScreenshotStub(false)}>
-              Close
+              סגירה
             </Button>
           </PanelBody>
         </Panel>
@@ -124,7 +124,7 @@ export function HandHistoryImporter() {
       {parsed.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-base-muted">
-            Parsed {parsed.length} hand{parsed.length > 1 ? "s" : ""}
+            {parsed.length === 1 ? "פוענחה יד אחת" : `פוענחו ${parsed.length} ידיים`}
           </h3>
           {parsed.map((hand, i) => (
             <Panel key={i}>
@@ -142,11 +142,11 @@ export function HandHistoryImporter() {
                     ))}
                   </div>
                   <span className="text-xs text-base-muted">
-                    Pot: ${hand.potSize ?? "?"} · {hand.heroPosition ?? "position unknown"}
+                    פוט: ${hand.potSize ?? "?"} · {hand.heroPosition ?? "פוזיציה לא ידועה"}
                   </span>
                 </div>
                 <Button size="sm" onClick={() => loadIntoAnalyzer(hand)}>
-                  Load into Analyzer
+                  טעינה לכלי הניתוח
                 </Button>
               </PanelBody>
             </Panel>

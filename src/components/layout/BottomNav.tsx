@@ -11,24 +11,37 @@ export function BottomNav() {
   const items = NAV_ITEMS.filter((i) => i.mobile);
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-base-border bg-base-panel/95 backdrop-blur-sm md:hidden">
-      {items.map((item) => {
-        const active =
-          item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              "flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px]",
-              active ? "text-accent-soft" : "text-base-muted"
-            )}
-          >
-            <NavIcon icon={item.icon} className="h-5 w-5" />
-            {item.label}
-          </Link>
-        );
-      })}
+    <nav className="fixed inset-x-0 bottom-0 z-40 w-full border-t border-base-border bg-base-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm md:hidden">
+      <div className="grid grid-cols-5">
+        {items.map((item) => {
+          const active =
+            item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex flex-col items-center justify-center gap-1 py-2.5"
+            >
+              <span
+                className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
+                  active ? "bg-accent/10 text-accent-soft" : "text-base-muted"
+                )}
+              >
+                <NavIcon icon={item.icon} className="h-5 w-5" />
+              </span>
+              <span
+                className={cn(
+                  "text-[10px] leading-none",
+                  active ? "font-medium text-accent-soft" : "text-base-muted"
+                )}
+              >
+                {item.label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }

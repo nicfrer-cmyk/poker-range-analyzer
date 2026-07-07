@@ -6,9 +6,9 @@ export default function CheckEmailPage() {
       <Panel className="w-full max-w-sm text-center">
         <PanelBody className="space-y-2 py-8">
           <span className="text-2xl">✉️</span>
-          <h1 className="text-lg font-semibold">Check your email</h1>
+          <h1 className="text-lg font-semibold">בדוק את תיבת המייל שלך</h1>
           <p className="text-sm text-base-muted">
-            We sent a confirmation link — click it to finish creating your account.
+            שלחנו קישור אימות — לחץ עליו כדי לסיים את יצירת החשבון.
           </p>
         </PanelBody>
       </Panel>

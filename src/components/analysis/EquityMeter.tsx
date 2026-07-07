@@ -5,11 +5,11 @@ import { motion } from "framer-motion";
 import { equityTone } from "@/components/ui/Badge";
 
 const TONE_HEX: Record<string, string> = {
-  crushing: "#0F6B3F",
-  ahead: "#2FBE6B",
-  close: "#E8C547",
-  risky: "#F0913B",
-  behind: "#E5484D",
+  crushing: "#0B7A3E",
+  ahead: "#1FA858",
+  close: "#C99A12",
+  risky: "#E07B22",
+  behind: "#DC3D45",
 };
 
 export function EquityMeter({ equityPct }: { equityPct: number }) {
@@ -63,7 +63,7 @@ export function EquityMeter({ equityPct }: { equityPct: number }) {
       </svg>
       <div className="absolute flex flex-col items-center">
         <span className="text-3xl font-bold tabular-nums">{display.toFixed(1)}%</span>
-        <span className="text-xs text-base-muted">hero equity</span>
+        <span className="text-xs text-base-muted">אקוויטי</span>
       </div>
     </div>
   );

@@ -17,14 +17,14 @@ const heebo = Heebo({
 });
 
 export const metadata: Metadata = {
-  title: "Poker Range Analyzer",
+  title: "מנתח טווחי פוקר",
   description:
-    "Post-game poker hand and range analysis — understand where your hand stood against a villain's range, and what the right play was.",
+    "ניתוח ידיים וטווחים בפוקר אחרי המשחק — תבין איפה היד שלך עמדה מול הטווח של היריב, ומה היה נכון לעשות.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Poker Range Analyzer",
+    statusBarStyle: "default",
+    title: "מנתח טווחי פוקר",
   },
   icons: {
     icon: "/icons/icon-192.png",
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0A0C10",
+  themeColor: "#FFFFFF",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -45,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`dark ${inter.variable} ${heebo.variable}`}>
+    <html lang="he" dir="rtl" className={`${heebo.variable} ${inter.variable}`}>
       <body className="min-h-screen font-sans">
         <Providers>{children}</Providers>
         <ServiceWorkerRegister />

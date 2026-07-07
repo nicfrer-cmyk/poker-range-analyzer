@@ -3,9 +3,9 @@ import { ComingSoon } from "@/components/ui/ComingSoon";
 export default function BankrollPage() {
   return (
     <ComingSoon
-      wave="Wave 4 — Expansion"
-      title="Bankroll Tracker"
-      description="Track session results over time, win/loss graphs by stakes and game type, and responsible bankroll management guidance. Coming soon."
+      wave="גל 4 — הרחבה"
+      title="מעקב בנקרול"
+      description="עקוב אחר תוצאות הסשנים שלך לאורך זמן, גרפים של רווח/הפסד לפי סטייקים וסוג משחק, והנחיות לניהול בנקרול אחראי. בקרוב."
     />
   );
 }

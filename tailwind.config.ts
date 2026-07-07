@@ -7,23 +7,23 @@ const config: Config = {
     extend: {
       colors: {
         base: {
-          bg: "#0A0C10",
-          panel: "#12151C",
-          panel2: "#181C25",
-          border: "#242936",
-          text: "#E8EAED",
-          muted: "#8A93A3",
+          bg: "#FFFFFF",
+          panel: "#F8F9FB",
+          panel2: "#EEF0F4",
+          border: "#E2E5EB",
+          text: "#161A20",
+          muted: "#697080",
         },
         status: {
-          crushing: "#0F6B3F", // dark green = crushing
-          ahead: "#2FBE6B", // green = ahead
-          close: "#E8C547", // yellow = close
-          risky: "#F0913B", // orange = risky
-          behind: "#E5484D", // red = behind
+          crushing: "#0B7A3E", // dark green = crushing
+          ahead: "#1FA858", // green = ahead
+          close: "#C99A12", // yellow/gold = close
+          risky: "#E07B22", // orange = risky
+          behind: "#DC3D45", // red = behind
         },
         accent: {
-          DEFAULT: "#6C6CF2",
-          soft: "#8F8FF7",
+          DEFAULT: "#5B5BE0",
+          soft: "#4646C6",
         },
         card: {
           red: "#D6303C",
@@ -31,15 +31,15 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "var(--font-heebo)", "system-ui", "sans-serif"],
+        sans: ["var(--font-heebo)", "var(--font-inter)", "system-ui", "sans-serif"],
       },
       borderRadius: {
         card: "16px",
         panel: "14px",
       },
       boxShadow: {
-        soft: "0 8px 30px -8px rgba(0,0,0,0.45)",
-        glow: "0 0 24px -4px rgba(108,108,242,0.35)",
+        soft: "0 2px 12px -2px rgba(20,24,32,0.08), 0 1px 2px rgba(20,24,32,0.04)",
+        glow: "0 0 20px -4px rgba(91,91,224,0.35)",
       },
       keyframes: {
         "count-glow": {

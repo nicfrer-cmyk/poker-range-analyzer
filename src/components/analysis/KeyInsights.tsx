@@ -6,11 +6,11 @@ export function KeyInsights({ insights }: { insights: Insight[] }) {
   return (
     <Panel>
       <PanelHeader>
-        <PanelTitle>Key Insights</PanelTitle>
+        <PanelTitle>תובנות מרכזיות</PanelTitle>
       </PanelHeader>
       <PanelBody className="space-y-2.5">
         {insights.length === 0 && (
-          <p className="text-sm text-base-muted">No insights yet — enter a hand to analyze.</p>
+          <p className="text-sm text-base-muted">אין עדיין תובנות — הזן יד לניתוח.</p>
         )}
         {insights.map((insight) => (
           <div key={insight.id} className="flex items-start gap-2.5">

@@ -15,7 +15,7 @@ export default function SignupPage({
     const consent = formData.get("consent");
     if (!consent) {
       const { redirect } = await import("next/navigation");
-      redirect(`/signup?error=${encodeURIComponent("Please accept the Terms and Privacy Policy.")}`);
+      redirect(`/signup?error=${encodeURIComponent("יש לאשר את תנאי השימוש ומדיניות הפרטיות.")}`);
     }
     const result = await signUpWithEmail(email, password);
     if (result.error) {
@@ -35,9 +35,9 @@ export default function SignupPage({
         <PanelBody className="space-y-5">
           <div className="text-center">
             <span className="text-2xl">♠</span>
-            <h1 className="mt-2 text-lg font-semibold">Create your account</h1>
+            <h1 className="mt-2 text-lg font-semibold">יצירת חשבון</h1>
             <p className="mt-1 text-xs text-base-muted">
-              Free plan included — no card required.
+              כולל מסלול חינמי — לא נדרש כרטיס אשראי.
             </p>
           </div>
           {searchParams.error && (
@@ -50,7 +50,7 @@ export default function SignupPage({
               name="email"
               type="email"
               required
-              placeholder="Email"
+              placeholder="אימייל"
               className="w-full rounded-lg border border-base-border bg-base-panel2 px-3 py-2 text-sm outline-none focus:border-accent"
             />
             <input
@@ -58,26 +58,26 @@ export default function SignupPage({
               type="password"
               required
               minLength={8}
-              placeholder="Password (min 8 characters)"
+              placeholder="סיסמה (לפחות 8 תווים)"
               className="w-full rounded-lg border border-base-border bg-base-panel2 px-3 py-2 text-sm outline-none focus:border-accent"
             />
             <label className="flex items-start gap-2 text-xs text-base-muted">
               <input type="checkbox" name="consent" required className="mt-0.5" />
-              I agree to the Terms of Service and Privacy Policy.
+              אני מאשר/ת את תנאי השימוש ומדיניות הפרטיות.
             </label>
             <Button type="submit" className="w-full">
-              Create Account
+              צור חשבון
             </Button>
           </form>
           <form action={googleAction}>
             <Button type="submit" variant="secondary" className="w-full">
-              Continue with Google
+              המשך עם גוגל
             </Button>
           </form>
           <p className="text-center text-xs text-base-muted">
-            Already have an account?{" "}
+            כבר יש לך חשבון?{" "}
             <Link href="/login" className="text-accent-soft">
-              Sign in
+              התחברות
             </Link>
           </p>
         </PanelBody>

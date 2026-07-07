@@ -4,6 +4,38 @@ Source spec: `poker-analyzer-spec.pdf` (Hebrew, v1.0, July 2026). This file trac
 actually built vs. what's still blocked on a real decision or credential — read this before
 assuming something is "done."
 
+## UI overhaul — 2026-07-07 (second pass)
+
+Per user request, the whole app was converted from English/dark-theme to **Hebrew/RTL/light-
+theme**, plus several UX changes:
+- `<html lang="he" dir="rtl">` app-wide; every user-facing string translated to Hebrew (see
+  `src/lib/labels.ts` for the shared hand-category/draw-type Hebrew label dictionary — reuse
+  it rather than inventing new terms if you add more poker-term UI text).
+- Light theme: `tailwind.config.ts` color tokens flipped to white/light-gray backgrounds with
+  dark text (was near-black with light text). If you add new components, use the `base-*`/
+  `status-*`/`accent` Tailwind tokens, never hardcode hex — that's what made this flip
+  possible in ~10 files instead of ~60.
+- Analyze page restructured: entering the flop now opens one continuous 3-card picker
+  session (was one card at a time); results (equity/win-tie-lose, pot odds, the Coach) render
+  in a column that's sticky beside the inputs on desktop and appears immediately after hero-
+  card entry on mobile, instead of requiring a scroll past the range builder.
+- The Coach panel is now part of the always-visible results (previously buried inside the
+  collapsed Deep Analysis section).
+- Hero Summary now shows an explicit win/tie/lose % breakdown, not just the headline equity
+  number.
+- New **אתגרים/Leaderboard** page (`/leaderboard`, `src/lib/leaderboard.ts`) — daily/weekly/
+  monthly personal challenge tracking (hands analyzed, decision accuracy, a day-streak
+  counter) computed from locally-saved hands. Deliberately framed as personal
+  challenges, not a real multiplayer leaderboard — there's no cross-user comparison since hand
+  data is still local-only per browser (see the Supabase data-layer-swap item below). A real
+  social leaderboard is a natural follow-up once that swap happens.
+- Sidebar/bottom-nav rebuilt: sidebar is `sticky h-screen` (was relying on flex-stretch, which
+  could gap on short pages), bottom nav uses a `grid-cols-5` (was flex, which could leave
+  around uneven-width gaps) and now includes the leaderboard tab.
+- Google OAuth button exists and is wired to Supabase, but does not yet work — the user needs
+  to create a Google Cloud OAuth app and add its credentials in Supabase (Authentication →
+  Providers → Google) before it will function. Email/password auth is fully live.
+
 ## Shipped (this build)
 
 **Core engine** (`src/lib/engine/`) — pure TypeScript, fully unit-tested (35 tests):

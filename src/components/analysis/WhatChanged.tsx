@@ -4,11 +4,11 @@ export function WhatChanged({ items }: { items: string[] }) {
   return (
     <Panel>
       <PanelHeader>
-        <PanelTitle>What Changed?</PanelTitle>
+        <PanelTitle>מה השתנה?</PanelTitle>
       </PanelHeader>
       <PanelBody>
         {items.length === 0 ? (
-          <p className="text-sm text-base-muted">No street change yet — this is the flop or preflop.</p>
+          <p className="text-sm text-base-muted">אין עדיין שינוי רחוב — זה הפלופ או פרה-פלופ.</p>
         ) : (
           <ul className="space-y-2 text-sm text-base-text/90">
             {items.map((item, i) => (

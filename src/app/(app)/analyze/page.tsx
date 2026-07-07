@@ -24,6 +24,15 @@ import { useMockPlan } from "@/lib/useMockPlan";
 import { canPerformAction } from "@/lib/plan";
 import { getTodayCount, incrementToday } from "@/lib/usageTracker";
 
+const POSITIONS = ["UTG", "CO", "BTN", "SB", "BB"];
+const ACTIONS: { value: "fold" | "check" | "call" | "bet" | "raise"; label: string }[] = [
+  { value: "fold", label: "פולד" },
+  { value: "check", label: "צ'ק" },
+  { value: "call", label: "קול" },
+  { value: "bet", label: "הימור" },
+  { value: "raise", label: "העלאה" },
+];
+
 export default function AnalyzePage() {
   const { input } = useAnalysisStore();
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -58,7 +67,7 @@ export default function AnalyzePage() {
     const alreadyCounted = countedHandKey.current === handKey;
     const gate = canPerformAction(plan, "runAnalysis", getTodayCount("analysis"));
     if (!gate.allowed && !alreadyCounted) {
-      setGateMessage(gate.reason ?? "Daily analysis limit reached.");
+      setGateMessage(gate.reason ?? "הגעת למגבלת הניתוחים היומית.");
       setResult(null);
       return;
     }
@@ -111,15 +120,33 @@ export default function AnalyzePage() {
   const tooltipFor = useMemo(
     () => (label: string) => {
       const eq = matrixEquities[label];
-      return eq !== undefined ? `${label}: ${eq.toFixed(1)}% hero equity` : label;
+      return eq !== undefined ? `${label}: ${eq.toFixed(1)}% אקוויטי` : label;
     },
     [matrixEquities]
   );
 
+  const resultsContent = !readyToAnalyze ? (
+    <Panel>
+      <PanelBody className="py-10 text-center text-sm text-base-muted">
+        בחר את שני הקלפים שלך למעלה כדי לראות את הניתוח.
+      </PanelBody>
+    </Panel>
+  ) : computing && !result ? (
+    <Panel>
+      <PanelBody className="py-10 text-center text-sm text-base-muted">מחשב אקוויטי…</PanelBody>
+    </Panel>
+  ) : result ? (
+    <div className="space-y-4">
+      <HeroSummary result={result} />
+      <PotOddsPanel result={result} />
+      <CoachPanel messages={result.coachMessages} />
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">New Analysis</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold">ניתוח חדש</h1>
         {result && (
           <div className="flex flex-wrap items-center gap-2">
             <select
@@ -127,7 +154,7 @@ export default function AnalyzePage() {
               onChange={(e) => setPosition(e.target.value)}
               className="rounded-lg border border-base-border bg-base-panel2 px-2 py-1.5 text-xs"
             >
-              {["UTG", "CO", "BTN", "SB", "BB"].map((p) => (
+              {POSITIONS.map((p) => (
                 <option key={p} value={p}>
                   {p}
                 </option>
@@ -138,9 +165,9 @@ export default function AnalyzePage() {
               onChange={(e) => setAction(e.target.value as typeof action)}
               className="rounded-lg border border-base-border bg-base-panel2 px-2 py-1.5 text-xs"
             >
-              {["fold", "check", "call", "bet", "raise"].map((a) => (
-                <option key={a} value={a}>
-                  {a}
+              {ACTIONS.map((a) => (
+                <option key={a.value} value={a.value}>
+                  {a.label}
                 </option>
               ))}
             </select>
@@ -149,25 +176,17 @@ export default function AnalyzePage() {
               onClick={() => {
                 const gate = canPerformAction(plan, "saveHand", listHands().length);
                 if (!gate.allowed) {
-                  setGateMessage(gate.reason ?? "Cannot save another hand on this plan.");
+                  setGateMessage(gate.reason ?? "לא ניתן לשמור עוד ידיים במסלול הזה.");
                   return;
                 }
                 saveHand({ input, result, action, position });
                 setSaved(true);
               }}
             >
-              {saved ? "Saved ✓" : "Save Hand"}
+              {saved ? "נשמר ✓" : "שמור יד"}
             </Button>
           </div>
         )}
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <HandSetupPanel />
-        <RangeBuilder
-          value={input.villainRangeText}
-          onChange={(text) => useAnalysisStore.getState().setVillainRangeText(text)}
-        />
       </div>
 
       {gateMessage && (
@@ -175,33 +194,28 @@ export default function AnalyzePage() {
           <PanelBody className="flex flex-wrap items-center justify-between gap-3 py-3">
             <span className="text-sm text-status-risky">{gateMessage}</span>
             <a href="/billing">
-              <Button size="sm">Upgrade to Pro</Button>
+              <Button size="sm">שדרוג לפרו</Button>
             </a>
           </PanelBody>
         </Panel>
       )}
 
-      {!readyToAnalyze && (
-        <Panel>
-          <PanelBody className="py-10 text-center text-sm text-base-muted">
-            Pick both hero cards above to see the analysis.
-          </PanelBody>
-        </Panel>
-      )}
-
-      {readyToAnalyze && computing && !result && (
-        <Panel>
-          <PanelBody className="py-10 text-center text-sm text-base-muted">Calculating equity…</PanelBody>
-        </Panel>
-      )}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+        <div className="space-y-6">
+          <HandSetupPanel />
+          {/* On mobile, results appear right here — immediately after entering hero cards,
+              without needing to scroll past the range builder below. */}
+          <div className="lg:hidden">{resultsContent}</div>
+          <RangeBuilder
+            value={input.villainRangeText}
+            onChange={(text) => useAnalysisStore.getState().setVillainRangeText(text)}
+          />
+        </div>
+        <div className="hidden lg:sticky lg:top-6 lg:block">{resultsContent}</div>
+      </div>
 
       {result && (
         <>
-          {/* Layer 1 — Decision */}
-          <HeroSummary result={result} />
-          <PotOddsPanel result={result} />
-
-          {/* Layer 2 — Explanation */}
           <div className="grid gap-6 lg:grid-cols-2">
             <KeyInsights insights={result.keyInsights} />
             <RangePieChart buckets={result.rangeComposition} />
@@ -209,15 +223,14 @@ export default function AnalyzePage() {
 
           <div className="flex justify-center">
             <Button variant="secondary" onClick={() => setShowDeep((s) => !s)}>
-              {showDeep ? "Hide Deep Analysis" : "Show Deep Analysis"}
+              {showDeep ? "הסתר ניתוח מעמיק" : "הצג ניתוח מעמיק"}
             </Button>
           </div>
 
-          {/* Layer 3 — Deep Analysis */}
           {showDeep && computingDeep && (
             <Panel>
               <PanelBody className="py-8 text-center text-sm text-base-muted">
-                Computing deep analysis…
+                מחשב ניתוח מעמיק…
               </PanelBody>
             </Panel>
           )}
@@ -226,7 +239,7 @@ export default function AnalyzePage() {
               <Panel>
                 <PanelBody>
                   <p className="mb-3 text-sm font-semibold">
-                    Range Matrix — hero equity vs each combo
+                    מטריצת טווח — האקוויטי שלי מול כל קומבינציה
                   </p>
                   <RangeMatrix equities={matrixEquities} onTooltip={tooltipFor} />
                 </PanelBody>
@@ -235,10 +248,7 @@ export default function AnalyzePage() {
                 <WhatChanged items={result.whatChanged} />
                 <CardsToWatch best={nextCardOutlook.best} worst={nextCardOutlook.worst} />
               </div>
-              <div className="grid gap-6 lg:grid-cols-2">
-                <BlockerPanel blockers={result.blockers} />
-                <CoachPanel messages={result.coachMessages} />
-              </div>
+              <BlockerPanel blockers={result.blockers} />
             </div>
           )}
         </>
