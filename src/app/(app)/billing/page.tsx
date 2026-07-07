@@ -7,15 +7,22 @@
 //
 // The "Upgrade to Pro" buttons are plain <form> submissions bound to a
 // Server Action defined in this file, which itself POSTs to
-// `/api/stripe/checkout` (forwarding the user's auth cookie) and redirects
-// the browser to the returned Stripe Checkout URL — or back to this page
+// `/api/grow/checkout` (forwarding the user's auth cookie) and redirects
+// the browser to the returned Grow payment-page URL — or back to this page
 // with an error message on failure. This keeps the whole page a single
 // Server Component with no separate client-side button component needed.
 //
-// LOCAL-ONLY NOTE: with no real Supabase/Stripe project connected yet, this
+// Payment provider: Grow (decided 2026-07-07, replacing the Stripe
+// scaffolding — see src/lib/stripe/* and src/app/api/stripe/*, kept in
+// place but no longer the active path). The Grow checkout route is real
+// plumbing against Grow's actual API; the webhook route is a deliberate
+// stub until Grow's webhook-verification mechanism is confirmed — see
+// src/app/api/grow/webhook/route.ts's header comment and ROADMAP.md.
+//
+// LOCAL-ONLY NOTE: with no real Grow merchant account connected yet, this
 // page still renders (plan cards always show); the upgrade buttons will
-// surface a clear inline error instead of crashing until env vars are set —
-// see `.env.example`.
+// surface a clear inline error instead of crashing until GROW_USER_ID /
+// GROW_PAGE_CODE_CREDIT_CARD are set — see `.env.example`.
 // ---------------------------------------------------------------------------
 
 import { redirect } from "next/navigation";
@@ -23,7 +30,7 @@ import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { PLAN_LIMITS, type Plan } from "@/lib/plan";
-import { PRO_PRICING, type BillingInterval } from "@/lib/stripe/plans";
+import { PRO_PRICING_ILS, type BillingInterval } from "@/lib/grow/plans";
 
 function getOrigin(): string {
   const headerList = headers();
@@ -48,7 +55,7 @@ async function upgradeToPro(interval: BillingInterval) {
   let errorMessage: string | undefined;
 
   try {
-    const res = await fetch(`${getOrigin()}/api/stripe/checkout`, {
+    const res = await fetch(`${getOrigin()}/api/grow/checkout`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -147,7 +154,7 @@ export default async function BillingPage({
       )}
       {checkoutSuccess && (
         <div className="mb-6 rounded-2xl border border-status-crushing/40 bg-status-crushing/10 p-4 text-sm text-base-text">
-          תודה! המנוי שלך בתהליך הקמה — הדף הזה יציג גישת פרו ברגע ש-Stripe
+          תודה! המנוי שלך בתהליך הקמה — הדף הזה יציג גישת פרו ברגע ש-Grow
           יאשר את התשלום.
         </div>
       )}
@@ -168,7 +175,7 @@ export default async function BillingPage({
         {/* Free plan */}
         <div className="rounded-2xl border border-base-border bg-base-panel p-6">
           <h2 className="text-lg font-semibold">חינמי</h2>
-          <p className="mt-1 text-3xl font-bold">$0</p>
+          <p className="mt-1 text-3xl font-bold">₪0</p>
           <ul className="mt-4 space-y-2 text-sm text-base-text/90">
             <li>{PLAN_LIMITS.FREE.dailyQuickAnalysisLimit} ניתוחים מהירים ביום</li>
             <li>{PLAN_LIMITS.FREE.dailyAnalysisLimit} ניתוחים מתקדמים ביום</li>
@@ -197,12 +204,12 @@ export default async function BillingPage({
         <div className="rounded-2xl border border-accent/40 bg-base-panel p-6">
           <h2 className="text-lg font-semibold">פרו</h2>
           <p className="mt-1 text-3xl font-bold">
-            ${PRO_PRICING.monthly.amountUsd}
+            ₪{PRO_PRICING_ILS.monthly.amountIls}
             <span className="text-base font-normal text-base-muted">/לחודש</span>
           </p>
           <p className="text-xs text-base-muted">
-            או ${PRO_PRICING.annual.amountUsd}/לשנה (הנחה של{" "}
-            {PRO_PRICING.annual.discountPercentVsMonthly}%) — מחיר זמני, בהמתנה
+            או ₪{PRO_PRICING_ILS.annual.amountIls}/לשנה (הנחה של{" "}
+            {PRO_PRICING_ILS.annual.discountPercentVsMonthly}%) — מחיר זמני, בהמתנה
             למחקר שוק
           </p>
           <ul className="mt-4 space-y-2 text-sm text-base-text/90">
@@ -236,7 +243,7 @@ export default async function BillingPage({
                   disabled={Boolean(configError)}
                   className="w-full rounded-xl border border-accent/40 p-3 text-sm font-medium text-base-text hover:bg-base-panel2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  שדרוג לפרו — חודשי (${PRO_PRICING.monthly.amountUsd}/לחודש)
+                  שדרוג לפרו — חודשי (₪{PRO_PRICING_ILS.monthly.amountIls}/לחודש)
                 </button>
               </form>
               <form action={upgradeAnnual}>
@@ -245,7 +252,7 @@ export default async function BillingPage({
                   disabled={Boolean(configError)}
                   className="w-full rounded-xl border border-accent/40 p-3 text-sm font-medium text-base-text hover:bg-base-panel2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  שדרוג לפרו — שנתי (${PRO_PRICING.annual.amountUsd}/לשנה)
+                  שדרוג לפרו — שנתי (₪{PRO_PRICING_ILS.annual.amountIls}/לשנה)
                 </button>
               </form>
             </div>

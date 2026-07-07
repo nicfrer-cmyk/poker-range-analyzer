@@ -179,28 +179,32 @@ tracker. Building these is the natural "Wave 2/3/4" next step per the spec's own
 - ~~**Supabase project**~~ — done: real project connected, migrated, RLS enabled (see above).
   `localHandStore`/`localRangeStore` still need to be swapped for real Supabase calls as a
   follow-up (currently everything still runs on `localStorage` even though the DB is live).
-- **Payment provider — open decision, not just a credentials gap**: the app is scaffolded
-  against Stripe (`src/lib/stripe/`, `src/app/api/stripe/*`, `src/app/(app)/billing/page.tsx`),
-  but the user doesn't have a Stripe account and actually processes payments through **Grow**
-  (formerly Meshulam, an Israeli payment gateway — docs at grow-il.readme.io) for other work.
-  Explicitly decided (2026-07-07) to leave the Stripe scaffolding in place for now and revisit
-  which provider to actually use later, rather than guess-porting to Grow. If/when that
-  decision happens:
-  - **If staying on Stripe**: needs a real account, two Price IDs
-    (`STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_ANNUAL`), and a webhook signing secret from
-    the Stripe dashboard. Pricing shown ($14/mo, $118/yr) is a placeholder per the spec's own
-    note — real pricing needs competitor research.
-  - **If switching to Grow**: this is a real re-architecture, not a config swap — Grow's
-    webhook model has no HMAC/signature verification (just a `webhookKey` field in the
-    payload body to match against), webhooks need to be manually enabled by Grow support per
-    account, and the concrete "create a payment page" API request/response shape wasn't fully
-    extractable from their docs site (readme.io renders parts of it client-side) — get the
-    exact API reference (or a working code sample) from the user's Grow dashboard/support
-    before writing the integration, don't guess field names for a payments flow.
+- **Payment provider — decided Grow (2026-07-07)**, replacing the earlier open Stripe-vs-Grow
+  question. Real integration built against Grow's actual API (`src/lib/grow/`,
+  `src/app/api/grow/*`, wired into `src/app/(app)/billing/page.tsx`) — the old Stripe files
+  are kept but no longer the active path. Two things still block this from processing a real
+  payment:
+  1. **Merchant credentials** — `GROW_USER_ID` / `GROW_PAGE_CODE_CREDIT_CARD` (from Grow
+     support once the account is approved) aren't set anywhere yet; `/api/grow/checkout`
+     returns a clear 501 until they are. Also confirm the **production API base URL** with
+     Grow support — `GROW_API_BASE_URL` currently defaults to their sandbox host
+     (`sandbox.meshulam.co.il`), inferred by mirroring the confirmed sandbox URL, not
+     independently confirmed.
+  2. **Webhook verification — the real blocker.** `src/app/api/grow/webhook/route.ts` is a
+     deliberate no-op stub: it logs whatever it receives but never touches the `Subscription`
+     table. Grow's public docs (grow-il.readme.io) don't document how to verify a webhook call
+     genuinely came from Grow (shared secret? HMAC signature header?) — the docs just say
+     webhooks must be "enabled for your account" by Grow support, which is almost certainly
+     where that mechanism gets communicated. Implementing that check is a hard prerequisite
+     before this route can safely upgrade anyone's plan — without it, anyone who finds the
+     webhook URL could forge a fake "payment succeeded" call. Ask Grow support directly rather
+     than guessing.
+  Pricing shown (₪49/mo, ₪410/yr) is a placeholder converted from the earlier USD placeholder
+  — real ILS pricing still needs competitor research, same caveat as before.
 - ~~**Netlify**~~ — done: live at https://poker-range-analyzer.netlify.app (see above). Still
   need to add that domain to Supabase's Auth redirect-URL allowlist.
-- **Anthropic API key**: reserved in `.env.example` for the future AI Hand Review feature;
-  not implemented yet.
+- ~~**Anthropic API key**~~ — done: set on Netlify (2026-07-07), AI Hand Review verified
+  working end-to-end against the live site.
 - **Vision API** (for "analyze from screenshot"): entry point exists in the importer UI but
   is a stub — needs a vision-capable model wired server-side once decided.
 
