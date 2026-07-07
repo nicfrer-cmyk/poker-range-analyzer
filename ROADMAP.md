@@ -61,6 +61,19 @@ hasn't been swapped for real Supabase-backed calls yet (that swap is the next re
   `is_preset = true` rows for everyone). `subscriptions` is read-only from the client — all
   writes go through the service-role key in the Stripe webhook handler.
 
+**Netlify — deployed 2026-07-07**: live at https://poker-range-analyzer.netlify.app (site
+name/project ID: `poker-range-analyzer`, team "YARIN ASHUAL"). Deployed via `netlify.toml` +
+`@netlify/plugin-nextjs` (Next.js Runtime v5, auto SSR/API-route/middleware support — no
+static export). The 5 Supabase env vars (`DATABASE_URL`, `DIRECT_URL`,
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) are
+set on the Netlify site (`netlify env:list` to check, `netlify env:set` to update). Stripe/
+Anthropic vars are NOT set yet — add them the same way once those services are connected.
+
+**Still needed for auth to fully work on the live domain**: Supabase's Auth settings have an
+allowlist for redirect URLs (Authentication → URL Configuration in the Supabase dashboard) —
+add `https://poker-range-analyzer.netlify.app` as the Site URL (or to Additional Redirect
+URLs) or email-confirmation links / OAuth callbacks will be rejected. Not done yet.
+
 ## Explicitly deferred / stubbed (by design, per spec's own wave plan)
 
 These have a nav entry + "coming soon" screen but no logic yet: Training Mode, Range vs Range
@@ -78,7 +91,8 @@ tracker. Building these is the natural "Wave 2/3/4" next step per the spec's own
   `STRIPE_PRICE_PRO_ANNUAL`), and a webhook signing secret, all created from the Stripe
   dashboard. Pricing shown ($14/mo, $118/yr) is a placeholder per the spec's own note — real
   pricing needs competitor research.
-- **Netlify (or chosen host)**: not deployed yet.
+- ~~**Netlify**~~ — done: live at https://poker-range-analyzer.netlify.app (see above). Still
+  need to add that domain to Supabase's Auth redirect-URL allowlist.
 - **Anthropic API key**: reserved in `.env.example` for the future AI Hand Review feature;
   not implemented yet.
 - **Vision API** (for "analyze from screenshot"): entry point exists in the importer UI but
@@ -105,8 +119,9 @@ tracker. Building these is the natural "Wave 2/3/4" next step per the spec's own
 2. ~~Create a Supabase project, set env vars, run migrations, write RLS policies.~~ Done.
    Remaining: swap `localHandStore`/`localRangeStore` for real Supabase-backed calls.
 3. Create a Stripe account (test mode first), set Price IDs + webhook secret, test the
-   checkout → webhook → plan-upgrade flow end to end.
-4. Deploy to Netlify (or chosen host), point Stripe webhook + Supabase Auth redirect URLs at
-   the real domain.
+   checkout → webhook → plan-upgrade flow end to end. Then set the same vars via
+   `netlify env:set` and point the Stripe webhook at the live `/api/stripe/webhook` URL.
+4. ~~Deploy to Netlify.~~ Done. Remaining: add the live domain to Supabase's Auth redirect-URL
+   allowlist so email confirmation / OAuth callbacks work end to end.
 5. Build the deferred Wave 2 features (Training Mode, AI Hand Review) — the retention engine
    the spec calls the real business justification for the Pro subscription.
