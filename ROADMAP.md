@@ -87,10 +87,24 @@ tracker. Building these is the natural "Wave 2/3/4" next step per the spec's own
 - ~~**Supabase project**~~ — done: real project connected, migrated, RLS enabled (see above).
   `localHandStore`/`localRangeStore` still need to be swapped for real Supabase calls as a
   follow-up (currently everything still runs on `localStorage` even though the DB is live).
-- **Stripe**: needs a real account, two Price IDs (`STRIPE_PRICE_PRO_MONTHLY`,
-  `STRIPE_PRICE_PRO_ANNUAL`), and a webhook signing secret, all created from the Stripe
-  dashboard. Pricing shown ($14/mo, $118/yr) is a placeholder per the spec's own note — real
-  pricing needs competitor research.
+- **Payment provider — open decision, not just a credentials gap**: the app is scaffolded
+  against Stripe (`src/lib/stripe/`, `src/app/api/stripe/*`, `src/app/(app)/billing/page.tsx`),
+  but the user doesn't have a Stripe account and actually processes payments through **Grow**
+  (formerly Meshulam, an Israeli payment gateway — docs at grow-il.readme.io) for other work.
+  Explicitly decided (2026-07-07) to leave the Stripe scaffolding in place for now and revisit
+  which provider to actually use later, rather than guess-porting to Grow. If/when that
+  decision happens:
+  - **If staying on Stripe**: needs a real account, two Price IDs
+    (`STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_ANNUAL`), and a webhook signing secret from
+    the Stripe dashboard. Pricing shown ($14/mo, $118/yr) is a placeholder per the spec's own
+    note — real pricing needs competitor research.
+  - **If switching to Grow**: this is a real re-architecture, not a config swap — Grow's
+    webhook model has no HMAC/signature verification (just a `webhookKey` field in the
+    payload body to match against), webhooks need to be manually enabled by Grow support per
+    account, and the concrete "create a payment page" API request/response shape wasn't fully
+    extractable from their docs site (readme.io renders parts of it client-side) — get the
+    exact API reference (or a working code sample) from the user's Grow dashboard/support
+    before writing the integration, don't guess field names for a payments flow.
 - ~~**Netlify**~~ — done: live at https://poker-range-analyzer.netlify.app (see above). Still
   need to add that domain to Supabase's Auth redirect-URL allowlist.
 - **Anthropic API key**: reserved in `.env.example` for the future AI Hand Review feature;
@@ -118,9 +132,11 @@ tracker. Building these is the natural "Wave 2/3/4" next step per the spec's own
 1. ~~Create/connect a GitHub repo, push.~~ Done.
 2. ~~Create a Supabase project, set env vars, run migrations, write RLS policies.~~ Done.
    Remaining: swap `localHandStore`/`localRangeStore` for real Supabase-backed calls.
-3. Create a Stripe account (test mode first), set Price IDs + webhook secret, test the
-   checkout → webhook → plan-upgrade flow end to end. Then set the same vars via
-   `netlify env:set` and point the Stripe webhook at the live `/api/stripe/webhook` URL.
+3. **Decide Stripe vs. Grow first** (see above — open decision, not yet made). Then either
+   create a Stripe account (test mode first), set Price IDs + webhook secret, test the
+   checkout → webhook → plan-upgrade flow end to end, and set the same vars via
+   `netlify env:set` — or get Grow's real API reference and rebuild the billing integration
+   against it.
 4. ~~Deploy to Netlify.~~ Done. Remaining: add the live domain to Supabase's Auth redirect-URL
    allowlist so email confirmation / OAuth callbacks work end to end.
 5. Build the deferred Wave 2 features (Training Mode, AI Hand Review) — the retention engine
