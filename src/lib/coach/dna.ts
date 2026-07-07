@@ -133,14 +133,23 @@ function computeBluffFrequency(hands: StoredHand[]): DnaMetric {
   };
 }
 
-function computeValueBetting(hands: StoredHand[]): DnaMetric {
+/** Strong hands where hero wasn't facing a bet, and how many of those went for a bet/raise
+ *  instead of checking. Exported so skillTree.ts's "valueBetting" domain reuses this exact
+ *  definition instead of re-deriving its own STRONG_TIERS filter — keeping the DNA page and the
+ *  Skill Tree page from ever showing two different numbers for what is the same underlying fact. */
+export function strongHandsNotFacingBet(hands: StoredHand[]): { total: number; wentForValue: number } {
   const strongNoBet = hands.filter((h) => !facingBet(h) && STRONG_TIERS.has(tierOf(h) as MadeTier));
   const wentForValue = strongNoBet.filter((h) => h.actionTaken === "bet" || h.actionTaken === "raise");
+  return { total: strongNoBet.length, wentForValue: wentForValue.length };
+}
+
+function computeValueBetting(hands: StoredHand[]): DnaMetric {
+  const { total, wentForValue } = strongHandsNotFacingBet(hands);
   return {
     id: "valueBetting",
     label: "נטייה ל-Value Betting",
-    valuePct: pct(wentForValue.length, strongNoBet.length),
-    sampleSize: strongNoBet.length,
+    valuePct: pct(wentForValue, total),
+    sampleSize: total,
     explanation: "כשלא היה הימור לענות עליו והיד שלך הייתה חזקה, כמה פעמים בחרת להמר ולגבות ערך במקום לצ'ק.",
     tip: "יד חזקה שצ'קית בלי הימור מפסידה ערך — כשאתה חושב שהיריב יכול לקרוא, המר.",
   };

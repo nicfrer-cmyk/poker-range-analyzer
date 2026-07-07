@@ -4,6 +4,66 @@ Source spec: `poker-analyzer-spec.pdf` (Hebrew, v1.0, July 2026). This file trac
 actually built vs. what's still blocked on a real decision or credential — read this before
 assuming something is "done."
 
+## Phase 1 of paid-SaaS roadmap — mandatory auth gate — 2026-07-07
+
+Product decision: registration is now required before using the app at all (no more
+free-without-account usage). This is Phase 1 of an 8-phase roadmap; the rest of the app's
+features are untouched.
+
+**Shipped:**
+- `middleware.ts` / `src/lib/supabase/middleware.ts`: every route now requires a signed-in
+  Supabase user except `/login`, `/signup`, `/auth/*`, `/forgot-password`, `/reset-password`,
+  `/api/*` (has its own per-route auth needs — the Stripe webhook in particular must stay
+  reachable with no user session), `/_next/*`, and static files. Unauthenticated visits to a
+  gated page redirect to `/login?next=<original-path>`; already-authenticated visits to
+  `/login`/`/signup` redirect to `/`. Still falls through unchanged when Supabase env vars
+  aren't set, so local dev before Supabase is wired up keeps working.
+- `/login` now honors `?next=` after a successful sign-in (validated same-origin relative path
+  only — no open redirect), via a new optional third `redirectTo` param on `signInWithEmail`
+  (`src/lib/supabase/auth-actions.ts`) — existing 2-arg callers are unaffected.
+- Forgot/reset password: `/forgot-password` + `/reset-password` pages (outside `(app)`), new
+  `requestPasswordReset` / `updatePassword` Server Actions. The reset page is a Client
+  Component because the recovery session Supabase encodes in the emailed link only exists in
+  the browser URL — constructing the Supabase browser client there is what actually parses it
+  and persists a session (via cookies) before the password-update Server Action runs.
+- "Remember me" checkbox added to `/login`, default-checked. **Does not currently change
+  behavior** — the installed `@supabase/ssr@0.4.0` hardcodes both `auth.persistSession: true`
+  and the session cookie's `maxAge` (always 1 year) inside `createBrowserClient`/its cookie
+  storage adapter, ignoring whatever is passed for either. There's no version-correct way to
+  make an individual sign-in session-only without a custom cookie storage adapter. Revisit if
+  `@supabase/ssr` is upgraded past 0.4.0 — see the code comment on the checkbox in
+  `src/app/login/page.tsx` for the exact mechanism.
+- Signup polish: client-side password-strength meter (`src/components/auth/PasswordField.tsx`,
+  `PasswordStrengthMeter.tsx` — length + character-variety heuristic, no external library), and
+  a Hebrew translation map for Supabase Auth's English error messages
+  (`src/lib/authErrors.ts`) wired into every action in `auth-actions.ts` — no raw English
+  string reaches the UI anymore.
+- Post-login welcome toast: `src/components/layout/AuthSync.tsx` (rendered from `AppShell`)
+  detects a one-shot `?justLoggedIn=1` flag set by the login redirect, shows "שלום
+  {email}, ברוך הבא בחזרה" for ~3s (framer-motion fade), then strips the flag from the URL.
+- **Anonymous local-data claiming**: `StoredHand`/`StoredOpponent`/`StoredSession`/`StoredRange`
+  (the four `localStorage`-backed stores) all gained an optional `userId?: string` field.
+  Existing pre-Phase-1 records simply have it `undefined`. Each store file exports an
+  idempotent `claimAnonymous*(userId)` that tags only unowned records; `src/lib/claimLocalData.ts`
+  calls all four. `AuthSync` runs this once per authenticated user per browser (guarded by a
+  `pra:claimed:<userId>` localStorage flag) on `(app)` mount. Nothing is synced to Supabase in
+  this phase — data stays local, just tagged with an owner; cross-device sync is an explicitly
+  later phase.
+- `src/app/(app)/settings/page.tsx` gained an "חשבון" section: shows the signed-in user's email
+  and a "התנתקות" button wired to `signOut()`. No other restructuring of that page.
+
+**Still needed before this is fully live:**
+- Google/Apple OAuth still need real credentials from the product owner (Google Cloud OAuth
+  app + Supabase provider config; Apple Developer + Supabase provider config) before "המשך עם
+  גוגל" actually completes sign-in — right now the button correctly kicks off the OAuth flow
+  code-path but Supabase has no provider configured, so it errors gracefully (translated to
+  Hebrew) instead of crashing.
+- The forgot/reset-password email flow hasn't been tested end-to-end against the live Supabase
+  project + Netlify domain yet (needs the Auth redirect-URL allowlist entry mentioned below).
+- Supabase's Auth redirect-URL allowlist (Authentication → URL Configuration) needs
+  `https://poker-range-analyzer.netlify.app` added — same still-open item as the OAuth
+  callback note further down this file.
+
 ## UI overhaul — 2026-07-07 (second pass)
 
 Per user request, the whole app was converted from English/dark-theme to **Hebrew/RTL/light-

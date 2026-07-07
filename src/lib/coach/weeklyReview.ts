@@ -24,6 +24,11 @@ export interface WeeklyReview {
   needsWork: WeeklyLeakTrend[];
   goalsNextWeek: string[];
   summaryHe: string;
+  /** Poker IQ movement over the last 7 days (iq.ts's getWeeklyDelta) — null when there isn't a
+   *  week of IQ history yet, or when the caller doesn't pass one in (e.g. no TrainingProgress
+   *  available yet). Folded into the headline summary so the weekly report genuinely reflects
+   *  IQ movement, not just this week's hand count. */
+  iqWeeklyDelta: number | null;
 }
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -46,7 +51,10 @@ function goalFor(trend: WeeklyLeakTrend): string {
   return `המשך לתרגל ${dimLabel}: ${label} — זה עדיין תחום שדורש תשומת לב בשבוע הקרוב.`;
 }
 
-export function buildWeeklyReview(hands: StoredHand[]): WeeklyReview {
+/** `iqWeeklyDelta` is optional (computed by the caller via iq.ts's getWeeklyDelta, the same
+ *  function the dashboard/IQ page already use for "change vs. last week") so this stays a pure
+ *  function of its inputs instead of reaching into TrainingProgress/SkillTree itself. */
+export function buildWeeklyReview(hands: StoredHand[], iqWeeklyDelta: number | null = null): WeeklyReview {
   const weekHands = hands.filter((h) => Number(h.timestamp) >= Date.now() - WEEK_MS);
   const week = weekStats(hands);
   const repeatedMistakes = topLeaks(weekHands, 3);
@@ -67,6 +75,13 @@ export function buildWeeklyReview(hands: StoredHand[]): WeeklyReview {
     ? formatLeakKey(repeatedMistakes[0].dimension, repeatedMistakes[0].key)
     : null;
 
+  const iqSentence =
+    iqWeeklyDelta === null
+      ? ""
+      : iqWeeklyDelta === 0
+        ? " ה-Poker IQ שלך נשאר יציב השבוע."
+        : ` ה-Poker IQ שלך ${iqWeeklyDelta > 0 ? "עלה" : "ירד"} ב-${Math.abs(iqWeeklyDelta)} נקודות השבוע.`;
+
   const summaryHe =
     weekHands.length === 0
       ? "לא נשמרו ידיים בשבוע האחרון — נתח כמה ידיים כדי לקבל סיכום שבועי אמיתי."
@@ -74,6 +89,7 @@ export function buildWeeklyReview(hands: StoredHand[]): WeeklyReview {
         (topLeakLabel
           ? ` הדפוס הבולט ביותר לשיפור היה ${topLeakLabel}${improved.some((t) => formatLeakKey(t.leak.dimension, t.leak.key) === topLeakLabel) ? ", ורואים שיפור לאורך השבוע." : "."}`
           : " לא זוהתה דליפה בולטת אחת — המשך כך.") +
+        iqSentence +
         " המשך להתמקד ביעדים לשבוע הקרוב מטה.";
 
   return {
@@ -84,5 +100,6 @@ export function buildWeeklyReview(hands: StoredHand[]): WeeklyReview {
     needsWork,
     goalsNextWeek,
     summaryHe,
+    iqWeeklyDelta,
   };
 }

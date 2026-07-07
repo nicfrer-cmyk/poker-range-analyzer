@@ -25,6 +25,9 @@ export interface StoredHand extends SavedHandRecord {
   sessionId?: string;
   /** Free-text note the user can attach when reviewing the hand later. */
   note?: string;
+  /** Owning user's Supabase auth id, once claimed (see `claimAnonymousHands` below).
+   *  Undefined on records created before Phase 1 (mandatory auth) or not yet claimed. */
+  userId?: string;
   /** Full street-by-street action sequence, when known (currently only populated for hands
    *  imported from a parsed hand history — see handHistoryParser.ts's ParsedHand.actions).
    *  Manually-entered or older hands simply omit this; the Hand Replay player falls back to
@@ -134,6 +137,24 @@ export function saveHand({
 
 export function clearAllHands() {
   writeAll([]);
+}
+
+/**
+ * Tags every hand that doesn't yet have an owner with `userId`. Idempotent — safe to call on
+ * every login, not just the first: already-claimed records (whether owned by this user or a
+ * different one on a shared browser) are left untouched. Data stays in `localStorage`; syncing
+ * it to Supabase is an explicitly later phase.
+ */
+export function claimAnonymousHands(userId: string): void {
+  const hands = readAll();
+  let changed = false;
+  for (const hand of hands) {
+    if (hand.userId === undefined) {
+      hand.userId = userId;
+      changed = true;
+    }
+  }
+  if (changed) writeAll(hands);
 }
 
 export function exportHandsAsJson(hands: StoredHand[] = listHands()): string {

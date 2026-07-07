@@ -31,10 +31,10 @@ import type { Card } from './types';
  *
  * `detectFormat` is a lightweight heuristic based on the header line only; `parseHandHistory`
  * itself is format-agnostic beyond that (it just looks for the PokerStars-style section
- * markers/line shapes above), which is what lets it also cover GGPoker/ClubGG exports.
+ * markers/line shapes above), which is what lets it also cover GGPoker/ClubGG/888poker exports.
  */
 
-export type HandHistoryFormat = 'pokerstars' | 'ggpoker' | 'clubgg' | 'unknown';
+export type HandHistoryFormat = 'pokerstars' | 'ggpoker' | 'clubgg' | '888poker' | 'unknown';
 
 export type Street = 'preflop' | 'flop' | 'turn' | 'river' | 'showdown';
 
@@ -93,6 +93,14 @@ export function detectFormat(text: string): HandHistoryFormat {
   if (/PokerStars/i.test(firstLine)) return 'pokerstars';
   if (/GG\s?Poker/i.test(firstLine)) return 'ggpoker';
   if (/Club\s?GG/i.test(firstLine)) return 'clubgg';
+  // 888poker exports typically start with a line like:
+  //   ***** 888poker Hand History for Game 123456789 *****
+  // matched loosely (case-insensitive "888" followed by "poker" nearby) rather than pinning
+  // the whole "***** ... *****" wrapper, since some 888poker export variants drop the asterisks.
+  if (/888\s?poker/i.test(firstLine)) return '888poker';
+  // TODO: WPT and ACR (Americas Cardroom) header formats haven't been verified against real
+  // sample hand histories yet — add detection once we have confirmed examples, rather than
+  // guessing a regex that could silently misfire on other formats.
   return 'unknown';
 }
 

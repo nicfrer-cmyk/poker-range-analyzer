@@ -14,12 +14,24 @@ import { runAnalysis } from "@/lib/analysisEngine";
 import { saveHand } from "@/lib/localHandStore";
 import { createSession } from "@/lib/localSessionStore";
 import { useMockPlan } from "@/lib/useMockPlan";
-import { canPerformAction } from "@/lib/plan";
+import { canPerformAction, isNearLimit } from "@/lib/plan";
 import { getTodayCount, incrementToday } from "@/lib/usageTracker";
 
 function defaultSessionName(): string {
   return `ייבוא מ-${new Date().toLocaleDateString("he-IL")}`;
 }
+
+/** Display label for a detected hand-history format. `parseHandHistory` is format-agnostic
+ *  beyond the header-line heuristic, so a hand can still parse successfully even when the
+ *  format itself wasn't recognized — the "unknown" label makes that explicit rather than
+ *  showing the bare, potentially confusing word "unknown". */
+const FORMAT_LABEL: Record<ParsedHand["format"], string> = {
+  pokerstars: "PokerStars",
+  ggpoker: "GGPoker",
+  clubgg: "ClubGG",
+  "888poker": "888poker",
+  unknown: "פורמט לא מזוהה — ניסיון פענוח כללי",
+};
 
 /** Hero's last recorded action in the hand, mapped to the analyzer's ActionTaken type.
  *  Falls back to "call" when nothing usable was parsed (e.g. hero folded pre-parse or the
@@ -66,6 +78,7 @@ export function HandHistoryImporter() {
   const [gateMessage, setGateMessage] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState(defaultSessionName());
   const [sessionSavedMessage, setSessionSavedMessage] = useState<string | null>(null);
+  const nearImportLimit = isNearLimit(plan, "importHand", getTodayCount("import"));
 
   const handleParse = () => {
     const gate = canPerformAction(plan, "importHand", getTodayCount("import"));
@@ -179,6 +192,9 @@ export function HandHistoryImporter() {
             <span className="text-xs text-base-muted">
               ייבוא מרובה — הדבק כמה ידיים, כל אחת מופרדת בשורה ריקה.
             </span>
+            {nearImportLimit && (
+              <Badge tone="close">כמעט הגעת למגבלת הייבוא היומית בתוכנית החינמית</Badge>
+            )}
           </div>
         </PanelBody>
       </Panel>
@@ -226,7 +242,7 @@ export function HandHistoryImporter() {
             <Panel key={i}>
               <PanelBody className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <Badge tone="neutral">{hand.format}</Badge>
+                  <Badge tone="neutral">{FORMAT_LABEL[hand.format]}</Badge>
                   <div className="flex gap-1">
                     {(hand.heroCards ?? []).map((c, j) => (
                       <PlayingCard key={j} card={c} size="sm" />

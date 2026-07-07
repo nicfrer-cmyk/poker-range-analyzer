@@ -10,6 +10,9 @@ export interface StoredOpponent {
   passiveAggressive: PassiveAggressive;
   notes: string;
   createdAt: number;
+  /** Owning user's Supabase auth id, once claimed (see `claimAnonymousOpponents` below).
+   *  Undefined on records created before Phase 1 (mandatory auth) or not yet claimed. */
+  userId?: string;
 }
 
 const STORAGE_KEY = "pra:opponents:v1";
@@ -68,6 +71,20 @@ export function deleteOpponent(id: string) {
 
 export function clearAllOpponents() {
   writeAll([]);
+}
+
+/** Tags every opponent profile that doesn't yet have an owner with `userId`. Idempotent — safe
+ *  to call on every login. Data stays in `localStorage`; Supabase sync is a later phase. */
+export function claimAnonymousOpponents(userId: string): void {
+  const opponents = readAll();
+  let changed = false;
+  for (const opponent of opponents) {
+    if (opponent.userId === undefined) {
+      opponent.userId = userId;
+      changed = true;
+    }
+  }
+  if (changed) writeAll(opponents);
 }
 
 export const STYLE_LABEL: Record<TightLoose | PassiveAggressive, string> = {

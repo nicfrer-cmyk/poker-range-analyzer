@@ -7,15 +7,29 @@ import { Badge } from "@/components/ui/Badge";
 import { listHands, type StoredHand } from "@/lib/localHandStore";
 import { buildWeeklyReview } from "@/lib/coach/weeklyReview";
 import { formatLeakKey, LEAK_DIMENSION_LABEL } from "@/lib/labels";
+import { loadProgress, type TrainingProgress } from "@/lib/training";
+import { computeSkillTree } from "@/lib/coach/skillTree";
+import { computePokerIQ, getIqHistory, getWeeklyDelta } from "@/lib/coach/iq";
 
 export default function WeeklyReviewPage() {
   const [hands, setHands] = useState<StoredHand[]>([]);
+  const [progress, setProgress] = useState<TrainingProgress | null>(null);
 
   useEffect(() => {
     setHands(listHands());
+    setProgress(loadProgress());
   }, []);
 
-  const review = useMemo(() => buildWeeklyReview(hands), [hands]);
+  // Same computeSkillTree/computePokerIQ/getWeeklyDelta chain the dashboard and /iq page use, so
+  // the weekly report's IQ movement always matches what those pages show for the same week.
+  const iqWeeklyDelta = useMemo(() => {
+    if (!progress) return null;
+    const skillTree = computeSkillTree(hands, progress);
+    const iq = computePokerIQ(hands, progress, skillTree);
+    return getWeeklyDelta(getIqHistory(), iq.score);
+  }, [hands, progress]);
+
+  const review = useMemo(() => buildWeeklyReview(hands, iqWeeklyDelta), [hands, iqWeeklyDelta]);
 
   return (
     <div className="space-y-6">
@@ -30,7 +44,7 @@ export default function WeeklyReviewPage() {
         </PanelBody>
       </Panel>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Panel>
           <PanelBody>
             <p className="text-xs text-base-muted">ידיים השבוע</p>
@@ -47,6 +61,19 @@ export default function WeeklyReviewPage() {
           <PanelBody>
             <p className="text-xs text-base-muted">טעויות חוזרות שזוהו</p>
             <p className="text-2xl font-bold text-status-behind">{review.repeatedMistakes.length}</p>
+          </PanelBody>
+        </Panel>
+        <Panel>
+          <PanelBody>
+            <p className="text-xs text-base-muted">שינוי ב-Poker IQ</p>
+            {review.iqWeeklyDelta === null ? (
+              <Badge tone="neutral">עדיין אין היסטוריה של שבוע</Badge>
+            ) : (
+              <p className={`text-2xl font-bold ${review.iqWeeklyDelta >= 0 ? "text-status-ahead" : "text-status-behind"}`}>
+                {review.iqWeeklyDelta >= 0 ? "+" : ""}
+                {review.iqWeeklyDelta}
+              </p>
+            )}
           </PanelBody>
         </Panel>
       </div>

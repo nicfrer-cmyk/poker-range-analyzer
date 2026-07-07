@@ -6,6 +6,7 @@ import { Panel, PanelBody } from "@/components/ui/Panel";
 import { Badge, equityTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { PlayingCard } from "@/components/cards/PlayingCard";
+import { CompareHandsModal } from "@/components/hands/CompareHandsModal";
 import {
   listHands,
   deleteHand,
@@ -20,6 +21,11 @@ import {
 } from "@/lib/localHandStore";
 import { MADE_TIER_LABEL } from "@/lib/labels";
 import type { StatusTone } from "@/lib/statusTone";
+import { useMockPlan } from "@/lib/useMockPlan";
+import { canPerformAction } from "@/lib/plan";
+
+/** Shortcuts for the free-text tag input — not the only allowed tags, just a quick-add. */
+const QUICK_TAGS = ["אגרסיבי", "בלאף", "קריאה אמיצה", "קולר", "משחק שגוי", "לבדיקה חוזרת"];
 
 const STREET_LABEL: Record<string, string> = {
   preflop: "פרה-פלופ",
@@ -51,6 +57,12 @@ export default function HandsLibraryPage() {
   const [maxEquity, setMaxEquity] = useState(100);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [tagDrafts, setTagDrafts] = useState<Record<string, string>>({});
+  const [compareMode, setCompareMode] = useState(false);
+  const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
+  const [comparing, setComparing] = useState(false);
+  const [plan] = useMockPlan();
+  const [gateMessage, setGateMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setHands(listHands());
@@ -89,11 +101,61 @@ export default function HandsLibraryPage() {
     setExpandedId(null);
   };
 
+  const addTag = (id: string, raw: string) => {
+    const value = raw.trim();
+    if (!value) return;
+    const hand = hands.find((h) => h.id === id);
+    if (!hand || hand.tags.includes(value)) return;
+    updateHand(id, { tags: [...hand.tags, value] });
+    setHands(listHands());
+  };
+
+  const removeTag = (id: string, tagValue: string) => {
+    const hand = hands.find((h) => h.id === id);
+    if (!hand) return;
+    updateHand(id, { tags: hand.tags.filter((t) => t !== tagValue) });
+    setHands(listHands());
+  };
+
+  const submitTagDraft = (id: string) => {
+    addTag(id, tagDrafts[id] ?? "");
+    setTagDrafts((prev) => ({ ...prev, [id]: "" }));
+  };
+
+  const toggleCompareMode = () => {
+    setCompareMode((prev) => !prev);
+    setSelectedForCompare([]);
+  };
+
+  const toggleSelectedForCompare = (id: string) => {
+    setSelectedForCompare((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const compareHands = useMemo<[StoredHand, StoredHand] | null>(() => {
+    if (selectedForCompare.length !== 2) return null;
+    const [a, b] = selectedForCompare.map((id) => hands.find((h) => h.id === id));
+    return a && b ? [a, b] : null;
+  }, [selectedForCompare, hands]);
+
   const handleExportJson = () => {
+    const gate = canPerformAction(plan, "exportData");
+    if (!gate.allowed) {
+      setGateMessage(gate.reason ?? "ייצוא נתונים זמין רק במנוי פרו.");
+      return;
+    }
+    setGateMessage(null);
     downloadTextFile("hands.json", exportHandsAsJson(filtered), "application/json");
   };
 
   const handleExportCsv = () => {
+    const gate = canPerformAction(plan, "exportData");
+    if (!gate.allowed) {
+      setGateMessage(gate.reason ?? "ייצוא נתונים זמין רק במנוי פרו.");
+      return;
+    }
+    setGateMessage(null);
     downloadTextFile("hands.csv", exportHandsAsCsv(filtered), "text/csv");
   };
 
@@ -101,7 +163,24 @@ export default function HandsLibraryPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">ספריית ידיים</h1>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {compareMode && (
+            <>
+              <Badge tone="neutral">נבחרו {selectedForCompare.length}/2 להשוואה</Badge>
+              {selectedForCompare.length === 2 && (
+                <Button size="sm" onClick={() => setComparing(true)}>
+                  השווה ידיים
+                </Button>
+              )}
+            </>
+          )}
+          <Button
+            variant={compareMode ? "primary" : "secondary"}
+            size="sm"
+            onClick={toggleCompareMode}
+          >
+            {compareMode ? "יציאה מבחירה מרובה" : "בחירה מרובה"}
+          </Button>
           <Button variant="secondary" size="sm" onClick={handleExportJson}>
             ייצוא JSON
           </Button>
@@ -116,6 +195,17 @@ export default function HandsLibraryPage() {
           </Link>
         </div>
       </div>
+
+      {gateMessage && (
+        <Panel className="border-status-risky/40">
+          <PanelBody className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <span className="text-sm text-status-risky">{gateMessage}</span>
+            <a href="/billing">
+              <Button size="sm">שדרוג לפרו</Button>
+            </a>
+          </PanelBody>
+        </Panel>
+      )}
 
       <Panel>
         <PanelBody className="flex flex-wrap items-end gap-3">
@@ -213,6 +303,18 @@ export default function HandsLibraryPage() {
                 <PanelBody className="space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-3">
+                      {compareMode && (
+                        <input
+                          type="checkbox"
+                          checked={selectedForCompare.includes(h.id)}
+                          onChange={() => toggleSelectedForCompare(h.id)}
+                          disabled={
+                            !selectedForCompare.includes(h.id) && selectedForCompare.length >= 2
+                          }
+                          className="h-4 w-4 accent-accent"
+                          aria-label="בחירה להשוואה"
+                        />
+                      )}
                       <div className="flex gap-1">
                         {h.heroCards.map((c, i) => (
                           <PlayingCard key={i} card={c} size="sm" />
@@ -261,6 +363,49 @@ export default function HandsLibraryPage() {
                     </div>
                   </div>
 
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {h.tags.map((t) => (
+                      <Badge key={t} tone="neutral" className="gap-1 pe-1.5">
+                        {t}
+                        <button
+                          type="button"
+                          onClick={() => removeTag(h.id, t)}
+                          aria-label={`הסרת תגית ${t}`}
+                          className="text-base-muted hover:text-status-behind"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                    <input
+                      value={tagDrafts[h.id] ?? ""}
+                      onChange={(e) =>
+                        setTagDrafts((prev) => ({ ...prev, [h.id]: e.target.value }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          submitTagDraft(h.id);
+                        }
+                      }}
+                      placeholder="תגית חדשה…"
+                      className="w-28 rounded-lg border border-base-border bg-base-panel2 px-2 py-1 text-xs outline-none focus:border-accent"
+                    />
+                    <Button size="sm" variant="ghost" onClick={() => submitTagDraft(h.id)}>
+                      הוספה
+                    </Button>
+                    {QUICK_TAGS.filter((qt) => !h.tags.includes(qt)).map((qt) => (
+                      <button
+                        key={qt}
+                        type="button"
+                        onClick={() => addTag(h.id, qt)}
+                        className="rounded-full border border-dashed border-base-border px-2 py-0.5 text-[11px] text-base-muted hover:border-accent hover:text-accent"
+                      >
+                        + {qt}
+                      </button>
+                    ))}
+                  </div>
+
                   {h.note && !isExpanded && (
                     <p className="rounded-lg bg-base-panel2 p-2 text-xs text-base-muted">{h.note}</p>
                   )}
@@ -291,6 +436,10 @@ export default function HandsLibraryPage() {
             );
           })}
         </div>
+      )}
+
+      {comparing && compareHands && (
+        <CompareHandsModal hands={compareHands} onClose={() => setComparing(false)} />
       )}
     </div>
   );

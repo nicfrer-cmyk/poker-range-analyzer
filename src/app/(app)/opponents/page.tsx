@@ -16,6 +16,8 @@ import {
   type StoredOpponent,
 } from "@/lib/localOpponentStore";
 import { listHands, updateHand, type StoredHand } from "@/lib/localHandStore";
+import { useMockPlan } from "@/lib/useMockPlan";
+import { canPerformAction } from "@/lib/plan";
 
 export default function OpponentsPage() {
   const [opponents, setOpponents] = useState<StoredOpponent[]>([]);
@@ -23,6 +25,8 @@ export default function OpponentsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingOpponent, setEditingOpponent] = useState<StoredOpponent | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [plan] = useMockPlan();
+  const [gateMessage, setGateMessage] = useState<string | null>(null);
 
   const refresh = () => {
     setOpponents(listOpponents());
@@ -34,6 +38,12 @@ export default function OpponentsPage() {
   }, []);
 
   const openCreateModal = () => {
+    const gate = canPerformAction(plan, "addOpponentProfile", listOpponents().length);
+    if (!gate.allowed) {
+      setGateMessage(gate.reason ?? "הגעת למגבלת פרופילי היריבים בתוכנית החינמית.");
+      return;
+    }
+    setGateMessage(null);
     setEditingOpponent(null);
     setModalOpen(true);
   };
@@ -108,6 +118,17 @@ export default function OpponentsPage() {
         </div>
         <Button onClick={openCreateModal}>פרופיל יריב חדש</Button>
       </div>
+
+      {gateMessage && (
+        <Panel className="border-status-risky/40">
+          <PanelBody className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <span className="text-sm text-status-risky">{gateMessage}</span>
+            <a href="/billing">
+              <Button size="sm">שדרוג לפרו</Button>
+            </a>
+          </PanelBody>
+        </Panel>
+      )}
 
       {opponents.length === 0 ? (
         <Panel className="mx-auto max-w-xl text-center">

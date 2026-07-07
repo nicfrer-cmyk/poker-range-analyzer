@@ -8,24 +8,27 @@ import { Step4VillainRange } from "@/components/wizard/Step4VillainRange";
 import { StepIndicator } from "@/components/wizard/StepIndicator";
 import { WizardNav } from "@/components/wizard/WizardNav";
 import { HeroSummary } from "@/components/analysis/HeroSummary";
+import { ResultsSummaryBar } from "@/components/analysis/ResultsSummaryBar";
 import { KeyInsights } from "@/components/analysis/KeyInsights";
 import { PotOddsPanel } from "@/components/analysis/PotOddsPanel";
 import { RangePieChart } from "@/components/range/RangePieChart";
 import { RangeMatrix } from "@/components/range/RangeMatrix";
+import { RangeExplorerPanel } from "@/components/range/RangeExplorerPanel";
 import { WhatChanged } from "@/components/analysis/WhatChanged";
 import { CardsToWatch } from "@/components/analysis/CardsToWatch";
 import { BlockerPanel } from "@/components/analysis/BlockerPanel";
 import { CoachPanel } from "@/components/analysis/CoachPanel";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import { Panel, PanelBody } from "@/components/ui/Panel";
 import { useAnalysisStore } from "@/lib/store/analysisStore";
 import { runAnalysis, computeMatrixEquities, computeNextCardOutlook } from "@/lib/analysisEngine";
 import { parseRange, removeConflicts } from "@/lib/engine/range";
-import type { Card } from "@/lib/engine/types";
+import type { Card, Combo } from "@/lib/engine/types";
 import type { AnalysisResult, NextCardOutlook } from "@/lib/analysisTypes";
 import { saveHand, listHands } from "@/lib/localHandStore";
 import { useMockPlan } from "@/lib/useMockPlan";
-import { canPerformAction } from "@/lib/plan";
+import { canPerformAction, isNearLimit } from "@/lib/plan";
 import { getTodayCount, incrementToday } from "@/lib/usageTracker";
 
 const TOTAL_STEPS = 5;
@@ -45,6 +48,7 @@ export default function AnalyzePage() {
     worst: NextCardOutlook[];
   }>({ best: [], worst: [] });
   const [computingDeep, setComputingDeep] = useState(false);
+  const [selectedComboLabel, setSelectedComboLabel] = useState<string | null>(null);
   const countedHandKey = useRef<string | null>(null);
 
   const readyToAnalyze =
@@ -52,9 +56,14 @@ export default function AnalyzePage() {
   const heroCard0 = input.heroCards[0];
   const heroCard1 = input.heroCards[1];
   const boardKey = input.board.join(",");
+  const heroCombo: Combo | null =
+    heroCard0 && heroCard1 ? { c1: heroCard0 as Card, c2: heroCard1 as Card } : null;
+  const boardCards = input.board.filter(Boolean) as Card[];
 
   const canGoNext =
     step === 2 ? readyToAnalyze : step === 4 ? input.villainRangeText.trim().length > 0 : true;
+
+  const nearAnalysisLimit = isNearLimit(plan, "runAnalysis", getTodayCount("analysis"));
 
   useEffect(() => {
     if (step !== 5 || !readyToAnalyze) return;
@@ -130,6 +139,12 @@ export default function AnalyzePage() {
       {step === 3 && <Step3PotDecision />}
       {step === 4 && <Step4VillainRange />}
 
+      {step === 4 && nearAnalysisLimit && (
+        <div className="flex justify-end">
+          <Badge tone="close">כמעט הגעת למגבלת הניתוחים היומית בתוכנית החינמית</Badge>
+        </div>
+      )}
+
       {step < 5 && (
         <WizardNav
           step={step}
@@ -168,6 +183,8 @@ export default function AnalyzePage() {
 
           {result && (
             <>
+              <ResultsSummaryBar input={input} result={result} />
+
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button
                   variant="secondary"
@@ -219,7 +236,14 @@ export default function AnalyzePage() {
                       <p className="mb-3 text-sm font-semibold">
                         מטריצת טווח — האקוויטי שלי מול כל קומבינציה
                       </p>
-                      <RangeMatrix equities={matrixEquities} onTooltip={tooltipFor} />
+                      <p className="mb-3 text-xs text-base-muted">
+                        לחיצה על קומבינציה פותחת חקירה מעמיקה שלה מול הידיים שלך.
+                      </p>
+                      <RangeMatrix
+                        equities={matrixEquities}
+                        onTooltip={tooltipFor}
+                        onCellClick={setSelectedComboLabel}
+                      />
                     </PanelBody>
                   </Panel>
                   <div className="grid gap-6 lg:grid-cols-2">
@@ -232,6 +256,15 @@ export default function AnalyzePage() {
             </>
           )}
         </div>
+      )}
+
+      {selectedComboLabel && heroCombo && (
+        <RangeExplorerPanel
+          label={selectedComboLabel}
+          heroCombo={heroCombo}
+          board={boardCards}
+          onClose={() => setSelectedComboLabel(null)}
+        />
       )}
     </div>
   );

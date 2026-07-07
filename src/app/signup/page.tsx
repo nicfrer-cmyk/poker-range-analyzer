@@ -2,6 +2,7 @@ import Link from "next/link";
 import { signUpWithEmail, signInWithOAuth } from "@/lib/supabase/auth-actions";
 import { Button } from "@/components/ui/Button";
 import { Panel, PanelBody } from "@/components/ui/Panel";
+import { PasswordField } from "@/components/auth/PasswordField";
 
 export default function SignupPage({
   searchParams,
@@ -53,14 +54,7 @@ export default function SignupPage({
               placeholder="אימייל"
               className="w-full rounded-lg border border-base-border bg-base-panel2 px-3 py-2 text-sm outline-none focus:border-accent"
             />
-            <input
-              name="password"
-              type="password"
-              required
-              minLength={8}
-              placeholder="סיסמה (לפחות 8 תווים)"
-              className="w-full rounded-lg border border-base-border bg-base-panel2 px-3 py-2 text-sm outline-none focus:border-accent"
-            />
+            <PasswordField minLength={8} placeholder="סיסמה (לפחות 8 תווים)" />
             <label className="flex items-start gap-2 text-xs text-base-muted">
               <input type="checkbox" name="consent" required className="mt-0.5" />
               אני מאשר/ת את תנאי השימוש ומדיניות הפרטיות.

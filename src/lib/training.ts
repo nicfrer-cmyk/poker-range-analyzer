@@ -433,9 +433,32 @@ function buildRawScenario(trackId: TrackId, rng: () => number): TrainingScenario
 }
 
 /**
+ * Weighted-random pick among `items`, each with a parallel `weights[i]` (must be positive).
+ * Split out from `generateScenario` so the selection math itself is unit-testable without
+ * paying for real scenario generation (which runs a Monte Carlo equity calc per candidate).
+ */
+export function pickWeighted<T>(items: T[], weights: number[], rng: () => number): T {
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  let r = rng() * totalWeight;
+  for (let i = 0; i < items.length; i++) {
+    r -= weights[i] as number;
+    if (r <= 0) return items[i] as T;
+  }
+  return items[items.length - 1] as T;
+}
+
+/**
  * Generates a new scenario for a track. Builds a handful of candidate deals and weights the
  * pick toward signatures the learner has missed before (a simple, honest stand-in for full
  * spaced repetition: wrong answers resurface more often, right answers cool off over time).
+ *
+ * Note on what this weighting can and can't do: each call only draws CANDIDATES_PER_PICK fresh
+ * random candidates, so a specific missed signature reappearing in *this* candidate pool is
+ * itself down to chance — the weighting only biases the pick *among whatever candidates come
+ * up*, it doesn't search for a target signature (that would mean re-running the not-cheap
+ * equity calc many times per call, which isn't worth the latency for a live user). Over many
+ * calls across a session this still meaningfully skews resurfacing toward missed signatures;
+ * see `pickWeighted`'s own test for a coverage of the actual selection math in isolation.
  */
 export function generateScenario(
   trackId: TrackId,
@@ -452,13 +475,7 @@ export function generateScenario(
   }
 
   const weights = candidates.map((c) => 1 + (missCounts[c.signature] ?? 0) * MISS_WEIGHT_BOOST);
-  const totalWeight = weights.reduce((a, b) => a + b, 0);
-  let r = rng() * totalWeight;
-  for (let i = 0; i < candidates.length; i++) {
-    r -= weights[i] as number;
-    if (r <= 0) return candidates[i] as TrainingScenario;
-  }
-  return candidates[candidates.length - 1] as TrainingScenario;
+  return pickWeighted(candidates, weights, rng);
 }
 
 // ---------------------------------------------------------------------------

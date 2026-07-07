@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
@@ -11,6 +11,9 @@ import { listHands, clearAllHands, downloadTextFile } from "@/lib/localHandStore
 import { listOpponents, clearAllOpponents } from "@/lib/localOpponentStore";
 import { listSessions, clearAllSessions } from "@/lib/localSessionStore";
 import { listRanges, clearAllRanges } from "@/lib/localRangeStore";
+import { createClient } from "@/lib/supabase/client";
+import { signOut } from "@/lib/supabase/auth-actions";
+import { canPerformAction } from "@/lib/plan";
 
 function exportAllData() {
   const payload = {
@@ -39,6 +42,32 @@ export default function SettingsPage() {
   const [theme, setTheme] = useTheme();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleted, setDeleted] = useState(false);
+  const [exportGateMessage, setExportGateMessage] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    try {
+      const supabase = createClient();
+      supabase.auth.getUser().then(({ data }) => {
+        setEmail(data.user?.email ?? null);
+        setUserId(data.user?.id ?? null);
+      });
+    } catch {
+      // Supabase not configured yet (local dev) — nothing to show.
+    }
+  }, []);
+
+  const handleReplayOnboarding = () => {
+    if (!userId) return;
+    try {
+      window.localStorage.removeItem(`pra:onboarded:${userId}`);
+    } catch {
+      // localStorage unavailable — nothing to clear.
+    }
+    window.location.reload();
+  };
 
   const handleDeleteAll = () => {
     deleteAllData();
@@ -46,9 +75,39 @@ export default function SettingsPage() {
     setDeleted(true);
   };
 
+  const handleExportAll = () => {
+    const gate = canPerformAction(plan, "exportData");
+    if (!gate.allowed) {
+      setExportGateMessage(gate.reason ?? "ייצוא נתונים זמין רק במסלול פרו.");
+      return;
+    }
+    setExportGateMessage(null);
+    exportAllData();
+  };
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    await signOut();
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">הגדרות</h1>
+
+      <Panel>
+        <PanelHeader>
+          <PanelTitle>חשבון</PanelTitle>
+        </PanelHeader>
+        <PanelBody className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium">{email ?? "…"}</p>
+            <p className="text-sm text-base-muted">מחובר/ת למנתח טווחי פוקר.</p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={handleSignOut} disabled={signingOut}>
+            {signingOut ? "מתנתק/ת…" : "התנתקות"}
+          </Button>
+        </PanelBody>
+      </Panel>
 
       <Panel>
         <PanelHeader>
@@ -78,6 +137,32 @@ export default function SettingsPage() {
 
       <Panel>
         <PanelHeader>
+          <PanelTitle>ניהול מנוי</PanelTitle>
+          <Badge tone={plan === "PRO" ? "ahead" : "neutral"}>{plan === "PRO" ? "פרו" : "חינמי"}</Badge>
+        </PanelHeader>
+        <PanelBody className="space-y-2">
+          <p className="text-sm text-base-muted">
+            התוכנית הנוכחית שלך: <span className="font-medium text-base-text">{plan === "PRO" ? "פרו" : "חינמי"}</span>.
+          </p>
+          {plan === "PRO" ? (
+            <p className="text-sm text-base-muted">
+              לניהול המנוי או ביטולו, פנה לתמיכה — עדיין אין חיבור אמיתי לספק תשלומים, כך
+              שהניהול כרגע נעשה ידנית מולנו ולא דרך פורטל עצמאי.
+            </p>
+          ) : (
+            <p className="text-sm text-base-muted">
+              אין לך מנוי פרו פעיל כרגע.{" "}
+              <Link href="/billing" className="text-accent-soft underline">
+                אפשר לשדרג לפרו כאן
+              </Link>
+              .
+            </p>
+          )}
+        </PanelBody>
+      </Panel>
+
+      <Panel>
+        <PanelHeader>
           <PanelTitle>תצוגה</PanelTitle>
         </PanelHeader>
         <PanelBody className="space-y-3">
@@ -92,6 +177,20 @@ export default function SettingsPage() {
             <Button variant={theme === "dark" ? "primary" : "secondary"} size="sm" onClick={() => setTheme("dark")}>
               כהה
             </Button>
+          </div>
+
+          <div className="border-t border-base-border pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">סיור ההיכרות</p>
+                <p className="text-sm text-base-muted">
+                  רוצים לעבור שוב על ההסבר הראשוני על המערכת? אפשר להציג אותו מחדש בכל רגע.
+                </p>
+              </div>
+              <Button variant="secondary" size="sm" onClick={handleReplayOnboarding} disabled={!userId}>
+                הצג את סיור ההיכרות מחדש
+              </Button>
+            </div>
           </div>
         </PanelBody>
       </Panel>
@@ -108,10 +207,18 @@ export default function SettingsPage() {
                 קובץ JSON אחד עם כל הידיים, הטווחים, הסשנים ופרופילי היריבים ששמרת.
               </p>
             </div>
-            <Button variant="secondary" size="sm" onClick={exportAllData}>
+            <Button variant="secondary" size="sm" onClick={handleExportAll}>
               ייצוא הכל
             </Button>
           </div>
+          {exportGateMessage && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-status-risky/40 bg-status-risky/10 px-3 py-2">
+              <span className="text-sm text-status-risky">{exportGateMessage}</span>
+              <Link href="/billing">
+                <Button size="sm">שדרוג לפרו</Button>
+              </Link>
+            </div>
+          )}
 
           <div className="border-t border-base-border pt-4">
             <div className="flex flex-wrap items-center justify-between gap-3">

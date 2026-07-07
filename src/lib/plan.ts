@@ -140,65 +140,65 @@ export function canPerformAction(
       return checkLimit(
         currentUsage,
         limits.dailyAnalysisLimit,
-        "You've reached today's analysis limit on the Free plan."
+        "הגעת למגבלת הניתוחים היומית בתוכנית החינמית."
       );
 
     case "saveHand":
       return checkLimit(
         currentUsage,
         limits.maxSavedHands,
-        "You've reached the saved-hands limit on the Free plan."
+        "לא ניתן לשמור עוד ידיים בתוכנית החינמית."
       );
 
     case "importHand":
       return checkLimit(
         currentUsage,
         limits.dailyImportLimit,
-        "You've reached today's import limit on the Free plan."
+        "הגעת למגבלת הייבוא היומית בתוכנית החינמית."
       );
 
     case "bulkImportHands":
       return checkFeature(
         limits.bulkImportAllowed,
-        "Bulk hand history import is a Pro feature."
+        "ייבוא מרובה זמין רק במנוי פרו."
       );
 
     case "useLeakFinder":
       return checkFeature(
         limits.leakFinderEnabled,
-        "Leak finder & session review is a Pro-only feature."
+        "גילוי דליפות וסקירת סשן זמינים רק במנוי פרו."
       );
 
     case "useRangeVsRange":
       return checkFeature(
         limits.rangeVsRangeEnabled,
-        "Range-vs-range analysis is a Pro-only feature."
+        "ניתוח טווח מול טווח זמין רק במנוי פרו."
       );
 
     case "useIcmCalculator":
       return checkFeature(
         limits.icmEnabled,
-        "The ICM calculator is a Pro-only feature."
+        "מחשבון ה-ICM זמין רק במנוי פרו."
       );
 
     case "runAiReview":
       return checkLimit(
         currentUsage,
         limits.dailyAiReviewLimit,
-        "You've used today's AI hand review on the Free plan."
+        "הגעת למגבלת ניתוחי ה-AI היומית בתוכנית החינמית."
       );
 
     case "addOpponentProfile":
       return checkLimit(
         currentUsage,
         limits.maxOpponentProfiles,
-        "You've reached the opponent profile limit on the Free plan."
+        "הגעת למגבלת פרופילי היריבים בתוכנית החינמית."
       );
 
     case "exportData":
       return checkFeature(
         limits.dataExportEnabled,
-        "Data export is a Pro-only feature."
+        "ייצוא נתונים זמין רק במנוי פרו."
       );
 
     default: {
@@ -220,4 +220,53 @@ function checkLimit(
 function checkFeature(enabled: boolean, reason: string): PlanCheckResult {
   if (enabled) return ALLOWED;
   return { allowed: false, reason, upgradeRequired: true };
+}
+
+/**
+ * Returns the numeric daily/count limit backing a usage-based `PlanAction`, or
+ * `undefined` for boolean-feature actions (which have no "near the limit"
+ * concept). Kept separate from `canPerformAction`'s switch so `isNearLimit`
+ * doesn't have to duplicate its branching.
+ */
+function usageLimitFor(action: PlanAction, limits: PlanLimits): number | undefined {
+  switch (action) {
+    case "runAnalysis":
+      return limits.dailyAnalysisLimit;
+    case "saveHand":
+      return limits.maxSavedHands;
+    case "importHand":
+      return limits.dailyImportLimit;
+    case "runAiReview":
+      return limits.dailyAiReviewLimit;
+    case "addOpponentProfile":
+      return limits.maxOpponentProfiles;
+    case "bulkImportHands":
+    case "useLeakFinder":
+    case "useRangeVsRange":
+    case "useIcmCalculator":
+    case "exportData":
+      return undefined;
+    default: {
+      const _exhaustive: never = action;
+      return _exhaustive;
+    }
+  }
+}
+
+/**
+ * True when a user is exactly one action away from hitting a usage-based
+ * limit (e.g. `currentUsage === limit - 1`), so the UI can show a gentle
+ * "almost there" warning before the hard block from `canPerformAction` kicks
+ * in. Always `false` for unlimited plans and for boolean-feature actions
+ * (`useIcmCalculator`, `exportData`, etc.) — those are all-or-nothing, not
+ * usage-counted, so "near the limit" doesn't apply to them.
+ */
+export function isNearLimit(
+  plan: Plan,
+  action: PlanAction,
+  currentUsage: number
+): boolean {
+  const limit = usageLimitFor(action, getPlanLimits(plan));
+  if (limit === undefined || isUnlimited(limit)) return false;
+  return currentUsage === limit - 1;
 }

@@ -10,7 +10,9 @@ export async function GET(request: NextRequest) {
       const supabase = createClient();
       await supabase.auth.exchangeCodeForSession(code);
     } catch {
-      return NextResponse.redirect(`${origin}/login?error=Could not complete sign-in.`);
+      return NextResponse.redirect(
+        `${origin}/login?error=${encodeURIComponent("לא הצלחנו להשלים את ההתחברות. נסה שוב.")}`
+      );
     }
   }
 

@@ -5,6 +5,9 @@ export interface StoredRange {
   name: string;
   combos: string; // range notation
   createdAt: number;
+  /** Owning user's Supabase auth id, once claimed (see `claimAnonymousRanges` below).
+   *  Undefined on records created before Phase 1 (mandatory auth) or not yet claimed. */
+  userId?: string;
 }
 
 const STORAGE_KEY = "pra:ranges:v1";
@@ -55,4 +58,18 @@ export function updateRange(id: string, patch: Partial<Pick<StoredRange, "name" 
 
 export function clearAllRanges() {
   writeAll([]);
+}
+
+/** Tags every range that doesn't yet have an owner with `userId`. Idempotent — safe to call
+ *  on every login. Data stays in `localStorage`; Supabase sync is a later phase. */
+export function claimAnonymousRanges(userId: string): void {
+  const ranges = readAll();
+  let changed = false;
+  for (const range of ranges) {
+    if (range.userId === undefined) {
+      range.userId = userId;
+      changed = true;
+    }
+  }
+  if (changed) writeAll(ranges);
 }

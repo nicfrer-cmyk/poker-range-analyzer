@@ -84,7 +84,7 @@ function verdictFromEquity(pct: number): { text: string; tone: StatusTone } {
   return { text: "אתה אנדרדוג משמעותי במצב הזה.", tone };
 }
 
-function outsFromDraws(draws: string[]): number {
+export function outsFromDraws(draws: string[]): number {
   let outs = 0;
   if (draws.includes("flush-draw")) outs += 9;
   if (draws.includes("open-ended-straight-draw")) outs += 8;

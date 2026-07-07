@@ -57,6 +57,18 @@ function expandRangeTextToLabels(text: string): Set<string> {
   return labels;
 }
 
+/** Standard poker combinatorics for a 2-rank matrix label, matching how src/lib/engine/range.ts
+ *  expands ranges: a pocket pair has C(4,2)=6 suit combos, a suited hand has 4 (one per suit),
+ *  and an offsuit hand has 12 (4 suits x 3 non-matching suits). */
+function comboCountForLabel(label: string): number {
+  if (label.length === 2) return 6;
+  return label.endsWith("s") ? 4 : 12;
+}
+
+function tooltipForLabel(label: string): string {
+  return `${label} — ${comboCountForLabel(label)} קומבואים`;
+}
+
 export function RangeBuilder({
   value,
   onChange,
@@ -111,7 +123,7 @@ export function RangeBuilder({
           placeholder="לדוגמה: 22+,ATs+,KQo"
           className="w-full rounded-lg border border-base-border bg-base-panel2 px-3 py-2 text-sm outline-none focus:border-accent"
         />
-        <RangeMatrix selected={selected} onToggle={toggle} onTooltip={(l) => l} />
+        <RangeMatrix selected={selected} onToggle={toggle} onTooltip={tooltipForLabel} />
       </PanelBody>
     </Panel>
   );

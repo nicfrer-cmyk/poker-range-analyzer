@@ -5,6 +5,9 @@ export interface StoredSession {
   name: string;
   handIds: string[];
   createdAt: number;
+  /** Owning user's Supabase auth id, once claimed (see `claimAnonymousSessions` below).
+   *  Undefined on records created before Phase 1 (mandatory auth) or not yet claimed. */
+  userId?: string;
 }
 
 const STORAGE_KEY = "pra:sessions:v1";
@@ -47,4 +50,18 @@ export function deleteSession(id: string) {
 
 export function clearAllSessions() {
   writeAll([]);
+}
+
+/** Tags every session that doesn't yet have an owner with `userId`. Idempotent — safe to call
+ *  on every login. Data stays in `localStorage`; Supabase sync is a later phase. */
+export function claimAnonymousSessions(userId: string): void {
+  const sessions = readAll();
+  let changed = false;
+  for (const session of sessions) {
+    if (session.userId === undefined) {
+      session.userId = userId;
+      changed = true;
+    }
+  }
+  if (changed) writeAll(sessions);
 }

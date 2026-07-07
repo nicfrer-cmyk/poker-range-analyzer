@@ -2,6 +2,7 @@ import type { StoredHand } from "@/lib/localHandStore";
 import { leaksByPosition, leaksByPotSizeBucket, leaksByStreet, isGoodDecision, type LeakGroup } from "@/lib/engine/leakFinder";
 import type { MadeTier } from "@/lib/engine/classify";
 import { TRACKS, type TrackId, type TrainingProgress } from "@/lib/training";
+import { strongHandsNotFacingBet } from "@/lib/coach/dna";
 
 export type SkillDomainId =
   | "preflop"
@@ -39,10 +40,6 @@ export interface SkillTreeResult {
 }
 
 const MIN_SAMPLE = 5;
-const STRONG_TIERS = new Set<MadeTier>([
-  "straight-flush", "quads", "full-house", "flush", "straight", "set", "trips",
-  "two-pair", "overpair", "top-pair",
-]);
 const WEAK_TIERS = new Set<MadeTier>(["air", "overcards", "underpair", "bottom-pair"]);
 
 function tierFromPct(pct: number): SkillTier {
@@ -111,9 +108,11 @@ export function computeSkillTree(hands: StoredHand[], progress: TrainingProgress
   const bluffingHands = { masteryPct: bluffLike.length >= MIN_SAMPLE ? Math.round((bluffLike.filter(isGoodDecision).length / bluffLike.length) * 100) : null, sampleSize: bluffLike.length };
   const bluffing = blend(bluffingHands, trackAccuracy(progress, "common-leaks"));
 
-  const strongNoBet = hands.filter((h) => h.potOddsRequired === 0 && STRONG_TIERS.has(h.handCategory as MadeTier));
-  const wentForValue = strongNoBet.filter((h) => h.actionTaken === "bet" || h.actionTaken === "raise");
-  const valueBetting = { masteryPct: strongNoBet.length >= MIN_SAMPLE ? Math.round((wentForValue.length / strongNoBet.length) * 100) : null, sampleSize: strongNoBet.length };
+  // Same "strong hand, no bet to face, did hero bet for value?" definition dna.ts's Value Betting
+  // metric uses (via strongHandsNotFacingBet), so this domain and the DNA page never disagree on
+  // the same underlying fact — this domain just applies its own MIN_SAMPLE significance bar to it.
+  const { total: strongNoBetCount, wentForValue: wentForValueCount } = strongHandsNotFacingBet(hands);
+  const valueBetting = { masteryPct: strongNoBetCount >= MIN_SAMPLE ? Math.round((wentForValueCount / strongNoBetCount) * 100) : null, sampleSize: strongNoBetCount };
 
   const riverPlay = masteryFromBadRate(leaksByStreet(hands).filter((g) => g.key === "river"));
 

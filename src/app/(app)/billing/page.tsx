@@ -172,14 +172,19 @@ export default async function BillingPage({
           <ul className="mt-4 space-y-2 text-sm text-base-text/90">
             <li>{PLAN_LIMITS.FREE.dailyAnalysisLimit} ניתוחי ידיים ביום</li>
             <li>עד {PLAN_LIMITS.FREE.maxSavedHands} ניתוחים שמורים</li>
-            <li>טווחים מוגדרים מראש + בנייה ידנית בסיסית של טווחים</li>
-            <li>סיכום יד + מאמן</li>
+            <li>טווחים מוגדרים מראש + בנייה ידנית בסיסית של טווחים, כולל חוקר טווחים (Range Explorer)</li>
+            <li>סיכום יד + מאמן, עם צפייה חוזרת ביד (Hand Replay)</li>
             <li>חישובי פוט אודס / SPR / EV</li>
             <li>{PLAN_LIMITS.FREE.dailyImportLimit} ייבואי היסטוריית יד ביום (ללא ייבוא מרובה)</li>
-            <li>מאמן אישי: גילוי דליפות, DNA, IQ, עץ מיומנויות, משימות יומיות</li>
+            <li>
+              מאמן אישי: גילוי דליפות, DNA פוקר, IQ פוקר, עץ מיומנויות, משימות יומיות, סקירה
+              שבועית ומסלול 30 יום
+            </li>
             <li>מצב אימון בסיסי</li>
-            <li className="text-base-muted">טווח מול טווח — לא כלול</li>
-            <li className="text-base-muted">מחשבון ICM — לא כלול</li>
+            <li>השוואת ידיים, שיתוף, תגיות וחיפוש בספריית הידיים</li>
+            <li>סיור היכרות והתראות באפליקציה</li>
+            <li className="text-base-muted">טווח מול טווח — בקרוב, טרם הושק</li>
+            <li className="text-base-muted">מחשבון ICM — בקרוב, טרם הושק</li>
             <li>{PLAN_LIMITS.FREE.dailyAiReviewLimit} ניתוחי AI ליד ביום</li>
             <li>עד {PLAN_LIMITS.FREE.maxOpponentProfiles} פרופילי יריבים</li>
             <li className="text-base-muted">ייצוא נתונים — לא כלול</li>
@@ -202,11 +207,16 @@ export default async function BillingPage({
           <ul className="mt-4 space-y-2 text-sm text-base-text/90">
             <li>ניתוחי ידיים ללא הגבלה</li>
             <li>ניתוחים שמורים ללא הגבלה</li>
-            <li>בניית טווחים מתקדמת עם שמירה ללא הגבלה</li>
+            <li>בניית טווחים מתקדמת עם שמירה ללא הגבלה, כולל חוקר טווחים (Range Explorer)</li>
             <li>ייבוא היסטוריית יד ללא הגבלה, כולל ייבוא מרובה</li>
+            <li>
+              מאמן אישי מלא: גילוי דליפות, DNA פוקר, IQ פוקר, עץ מיומנויות, משימות יומיות, סקירה
+              שבועית ומסלול 30 יום
+            </li>
             <li>מצב אימון מלא ומסלולי לימוד</li>
-            <li>ניתוח טווח מול טווח</li>
-            <li>מחשבון ICM</li>
+            <li>צפייה חוזרת ביד, השוואת ידיים, שיתוף, תגיות וחיפוש מתקדם</li>
+            <li className="text-base-muted">טווח מול טווח — בקרוב, טרם הושק (ללא תלות בתוכנית)</li>
+            <li className="text-base-muted">מחשבון ICM — בקרוב, טרם הושק (ללא תלות בתוכנית)</li>
             <li>ניתוחי AI ליד ללא הגבלה</li>
             <li>פרופילי יריבים ללא הגבלה</li>
             <li>ייצוא נתונים</li>

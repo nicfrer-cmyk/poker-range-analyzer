@@ -5,6 +5,7 @@ import {
   evaluateAnswer,
   recordAnswer,
   loadProgress,
+  pickWeighted,
 } from "./training";
 
 describe("training smoke", () => {
@@ -28,17 +29,25 @@ describe("training smoke", () => {
     }
   });
 
-  it("weights re-selection toward missed signatures", () => {
-    const s = generateScenario("pot-odds", {});
-    const missCounts = { [s.signature]: 8 };
-    // With a huge miss weight on this exact signature, generating many times should
-    // reproduce that signature far more than a 1-in-5 base rate would predict.
-    let hits = 0;
-    for (let i = 0; i < 40; i++) {
-      const candidate = generateScenario("pot-odds", missCounts);
-      if (candidate.signature === s.signature) hits++;
+  it("pickWeighted favors heavily-weighted items over many draws", () => {
+    // Tests the actual selection math `generateScenario` delegates to, without paying for real
+    // scenario generation (each of which runs a Monte Carlo equity calc) — a candidate pool of
+    // 5 items where one has a huge weight should win the large majority of 500 cheap draws.
+    const items = ["a", "b", "c", "d", "e"];
+    const weights = [1, 1, 1, 1, 21]; // "e" is heavily miss-weighted, like a real 8-miss boost
+    let hitsForE = 0;
+    for (let i = 0; i < 500; i++) {
+      if (pickWeighted(items, weights, Math.random) === "e") hitsForE++;
     }
-    expect(hits).toBeGreaterThan(0);
+    // Expected ~84% (21/25); assert well above the 20% an unweighted pick would give.
+    expect(hitsForE).toBeGreaterThan(250);
+  });
+
+  it("pickWeighted is deterministic for a given rng", () => {
+    const items = ["a", "b", "c"];
+    const weights = [1, 1, 1];
+    // rng() = 0.5 -> r = 0.5 * 3 = 1.5, first subtraction (1.5-1=0.5>0), second (0.5-1=-0.5<=0) -> "b"
+    expect(pickWeighted(items, weights, () => 0.5)).toBe("b");
   });
 
   it("records answers and updates streak/accuracy", () => {

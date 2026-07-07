@@ -14,10 +14,12 @@ import {
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel";
 import { Badge, equityTone } from "@/components/ui/Badge";
 import { listHands, type StoredHand } from "@/lib/localHandStore";
-import { computeSessionStats, topLeaks, type TopLeak } from "@/lib/engine/leakFinder";
+import { computeSessionStats, topLeaks, leaksByStreet, type TopLeak, type DecisionStreet } from "@/lib/engine/leakFinder";
 import { formatLeakKey, LEAK_DIMENSION_LABEL, STREET_LABEL } from "@/lib/labels";
 import { trendFor, type TrendDirection } from "@/lib/coach/weeklyReview";
 import { useTheme } from "@/lib/useTheme";
+import { cn } from "@/lib/utils/cn";
+import type { StatusTone } from "@/lib/statusTone";
 
 // Mirrors globals.css CSS variables per theme — recharts axis/grid/line colors need plain
 // rgb() strings, Tailwind classes don't apply to SVG stroke attributes.
@@ -39,6 +41,25 @@ const TREND_TONE: Record<TrendDirection, "crushing" | "behind" | "neutral"> = {
   flat: "neutral",
   unknown: "neutral",
 };
+
+const STREET_ORDER: DecisionStreet[] = ["preflop", "flop", "turn", "river"];
+
+// Same tone tokens/ratios Badge.tsx uses — kept local since Badge doesn't export its class map.
+const HEAT_TONE_CLASSES: Record<StatusTone, string> = {
+  crushing: "bg-status-crushing/20 text-status-crushing border-status-crushing/40",
+  ahead: "bg-status-ahead/20 text-status-ahead border-status-ahead/40",
+  close: "bg-status-close/20 text-status-close border-status-close/40",
+  risky: "bg-status-risky/20 text-status-risky border-status-risky/40",
+  behind: "bg-status-behind/20 text-status-behind border-status-behind/40",
+  neutral: "bg-base-panel2 text-base-muted border-base-border",
+};
+
+/** Reuses `equityTone`'s bucket thresholds, inverted: a high bad-decision-rate is "bad" the same
+ *  way low equity is, so feeding it `100 - rate%` maps mistake severity onto the same five tones
+ *  already used everywhere else on this page. */
+function streetHeatTone(badDecisionRate: number): StatusTone {
+  return equityTone(100 - badDecisionRate * 100);
+}
 
 function severityStars(leak: TopLeak): number {
   return Math.min(5, Math.max(1, Math.round(leak.badDecisionRate * 5)));
@@ -70,6 +91,7 @@ export default function LeaksPage() {
 
   const stats = useMemo(() => computeSessionStats(hands), [hands]);
   const leaks = useMemo(() => topLeaks(hands, 8), [hands]);
+  const streetGroups = useMemo(() => leaksByStreet(hands), [hands]);
 
   if (hands.length === 0) {
     return (
@@ -121,6 +143,32 @@ export default function LeaksPage() {
           </PanelBody>
         </Panel>
       </div>
+
+      <Panel>
+        <PanelHeader>
+          <PanelTitle>מפת חום — אחוז טעויות לפי רחוב</PanelTitle>
+        </PanelHeader>
+        <PanelBody className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {STREET_ORDER.map((street) => {
+            const group = streetGroups.find((g) => g.key === street);
+            const tone: StatusTone = group && group.count > 0 ? streetHeatTone(group.badDecisionRate) : "neutral";
+            return (
+              <div
+                key={street}
+                className={cn("rounded-lg border p-3 text-center", HEAT_TONE_CLASSES[tone])}
+              >
+                <p className="text-xs font-medium">{STREET_LABEL[street] ?? street}</p>
+                <p className="mt-1 text-xl font-bold">
+                  {group && group.count > 0 ? `${(group.badDecisionRate * 100).toFixed(0)}%` : "—"}
+                </p>
+                <p className="mt-0.5 text-[11px] opacity-80">
+                  {group && group.count > 0 ? `${group.count} ידיים` : "אין נתונים"}
+                </p>
+              </div>
+            );
+          })}
+        </PanelBody>
+      </Panel>
 
       <Panel>
         <PanelHeader>
