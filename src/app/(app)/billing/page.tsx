@@ -170,7 +170,8 @@ export default async function BillingPage({
           <h2 className="text-lg font-semibold">חינמי</h2>
           <p className="mt-1 text-3xl font-bold">$0</p>
           <ul className="mt-4 space-y-2 text-sm text-base-text/90">
-            <li>{PLAN_LIMITS.FREE.dailyAnalysisLimit} ניתוחי ידיים ביום</li>
+            <li>{PLAN_LIMITS.FREE.dailyQuickAnalysisLimit} ניתוחים מהירים ביום</li>
+            <li>{PLAN_LIMITS.FREE.dailyAnalysisLimit} ניתוחים מתקדמים ביום</li>
             <li>עד {PLAN_LIMITS.FREE.maxSavedHands} ניתוחים שמורים</li>
             <li>טווחים מוגדרים מראש + בנייה ידנית בסיסית של טווחים, כולל חוקר טווחים (Range Explorer)</li>
             <li>סיכום יד + מאמן, עם צפייה חוזרת ביד (Hand Replay)</li>

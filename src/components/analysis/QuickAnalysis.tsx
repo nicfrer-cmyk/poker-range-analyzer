@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel";
 import { PlayingCard } from "@/components/cards/PlayingCard";
 import { CardPicker } from "@/components/cards/CardPicker";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import { ResultsSummaryBar, type ResultsSummaryStats } from "@/components/analysis/ResultsSummaryBar";
+import { PaywallModal } from "@/components/billing/PaywallModal";
 import { useAnalysisStore } from "@/lib/store/analysisStore";
 import { runAnalysis, outsFromDraws } from "@/lib/analysisEngine";
 import { classifyHand, type MadeTier } from "@/lib/engine/classify";
@@ -14,8 +16,9 @@ import type { Card, Combo } from "@/lib/engine/types";
 import type { AnalysisResult } from "@/lib/analysisTypes";
 import type { StatusTone } from "@/lib/statusTone";
 import { saveHand, listHands } from "@/lib/localHandStore";
-import { canPerformAction } from "@/lib/plan";
+import { canPerformAction, isNearLimit } from "@/lib/plan";
 import { useMockPlan } from "@/lib/useMockPlan";
+import { getTodayCount, incrementToday } from "@/lib/usageTracker";
 
 type PickerTarget = { kind: "hero"; index: 0 | 1 } | { kind: "board"; indices: number[] };
 
@@ -63,6 +66,8 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
   const [saved, setSaved] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [plan] = useMockPlan();
+  const [paywallMessage, setPaywallMessage] = useState<string | null>(null);
+  const countedHandKey = useRef<string | null>(null);
 
   const used = usedCards();
   const heroCard0 = input.heroCards[0];
@@ -76,16 +81,35 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
   const heroCombo: Combo | null =
     heroCard0 && heroCard1 ? { c1: heroCard0 as Card, c2: heroCard1 as Card } : null;
 
+  const nearQuickAnalysisLimit = isNearLimit(
+    plan,
+    "runQuickAnalysis",
+    getTodayCount("quickAnalysis")
+  );
+
   useEffect(() => {
     if (!readyForQuick || !heroCombo) {
       setResult(null);
       return;
     }
-    // TODO(plan-limits): gate quick analysis usage here once "runQuickAnalysis" exists in plan.ts
+    const handKey = `${input.heroCards.join("")}-${input.board.join("")}`;
+    const alreadyCounted = countedHandKey.current === handKey;
+    const gate = canPerformAction(plan, "runQuickAnalysis", getTodayCount("quickAnalysis"));
+    if (!gate.allowed && !alreadyCounted) {
+      setPaywallMessage(gate.reason ?? "הגעת למגבלת הניתוחים המהירים היומית.");
+      setResult(null);
+      return;
+    }
+    setPaywallMessage(null);
     setComputing(true);
     setSaved(false);
     const timeout = setTimeout(() => {
-      setResult(runAnalysis(input));
+      const r = runAnalysis(input);
+      setResult(r);
+      if (r && !alreadyCounted) {
+        incrementToday("quickAnalysis");
+        countedHandKey.current = handKey;
+      }
       setComputing(false);
     }, 200);
     return () => clearTimeout(timeout);
@@ -162,8 +186,20 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
 
   return (
     <div className="space-y-4">
+      <PaywallModal
+        open={!!paywallMessage}
+        message={paywallMessage ?? ""}
+        onClose={() => setPaywallMessage(null)}
+      />
+
       {stats && (
         <ResultsSummaryBar input={input} stats={stats} />
+      )}
+
+      {!paywallMessage && nearQuickAnalysisLimit && (
+        <div className="flex justify-end">
+          <Badge tone="close">כמעט הגעת למגבלת הניתוחים המהירים היומית בתוכנית החינמית</Badge>
+        </div>
       )}
 
       <Panel>

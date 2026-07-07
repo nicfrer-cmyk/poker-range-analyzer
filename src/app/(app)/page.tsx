@@ -17,6 +17,7 @@ import { computePokerIQ, recordIqSnapshotIfNeeded, getIqHistory, getWeeklyDelta 
 import { generateDailyMissions, type Mission } from "@/lib/coach/missions";
 import { createClient } from "@/lib/supabase/client";
 import { getTipOfTheDay } from "@/lib/tipOfTheDay";
+import { useMockPlan } from "@/lib/useMockPlan";
 
 function greeting(): string {
   const hour = new Date().getHours();
@@ -38,6 +39,7 @@ export default function DashboardPage() {
   const [hands, setHands] = useState<StoredHand[]>([]);
   const [progress, setProgress] = useState<TrainingProgress | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [plan] = useMockPlan();
 
   useEffect(() => {
     setHands(listHands());
@@ -115,14 +117,21 @@ export default function DashboardPage() {
         <Panel>
           <PanelBody className="space-y-4 py-10 text-center">
             <p className="text-sm text-base-muted">
-              עדיין אין ידיים שמורות. נתח את היד הראשונה שלך כדי שהמאמן האישי יתחיל ללמוד אותך.
+              עדיין אין מספיק נתונים כדי לבנות לך פרופיל אישי. נתח 3 ידיים ראשונות כדי להתחיל.
             </p>
-            <div className="flex justify-center gap-3">
-              <Link href="/analyze">
-                <Button>ניתוח חדש</Button>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link href="/analyze?mode=quick">
+                <Button size="lg">ניתוח מהיר</Button>
+              </Link>
+              <Link href="/analyze?mode=advanced">
+                <Button variant="secondary" size="lg">
+                  ניתוח מתקדם
+                </Button>
               </Link>
               <Link href="/hands/import">
-                <Button variant="secondary">ייבוא היסטוריית ידיים</Button>
+                <Button variant="secondary" size="lg">
+                  ייבוא היסטוריה
+                </Button>
               </Link>
             </div>
           </PanelBody>
@@ -130,8 +139,13 @@ export default function DashboardPage() {
       ) : (
         <>
           <div className="flex flex-wrap gap-3">
-            <Link href="/analyze">
-              <Button size="lg">ניתוח חדש</Button>
+            <Link href="/analyze?mode=quick">
+              <Button size="lg">ניתוח מהיר</Button>
+            </Link>
+            <Link href="/analyze?mode=advanced">
+              <Button variant="secondary" size="lg">
+                ניתוח מתקדם
+              </Button>
             </Link>
             <Link href="/hands/import">
               <Button variant="secondary" size="lg">
@@ -336,6 +350,24 @@ export default function DashboardPage() {
               </div>
             </PanelBody>
           </Panel>
+
+          {plan === "FREE" && (
+            <Panel>
+              <PanelBody className="flex flex-wrap items-center justify-between gap-4 py-4">
+                <div>
+                  <p className="text-sm font-medium">
+                    רוצה ניתוחים ללא הגבלה, AI Review מלא ותכונות מתקדמות נוספות?
+                  </p>
+                  <p className="mt-1 text-xs text-base-muted">
+                    שדרוג לפרו פותח ניתוחים בלתי מוגבלים, טווח מול טווח, ICM ועוד.
+                  </p>
+                </div>
+                <Link href="/billing">
+                  <Button variant="secondary">שדרוג לפרו</Button>
+                </Link>
+              </PanelBody>
+            </Panel>
+          )}
         </>
       )}
     </div>

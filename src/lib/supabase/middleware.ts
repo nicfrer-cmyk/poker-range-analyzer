@@ -86,14 +86,9 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
       headers: request.headers,
     },
   });
-  // TEMP DIAGNOSTIC — remove once the live auth-gate issue is confirmed fixed. Never carries a
-  // secret value, only presence booleans, safe to expose.
-  response.headers.set("x-pra-mw-hit", "1");
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  response.headers.set("x-pra-mw-url-set", url ? "1" : "0");
-  response.headers.set("x-pra-mw-key-set", anonKey ? "1" : "0");
 
   if (!url || !anonKey) {
     // Supabase isn't configured yet — let the request through unchanged

@@ -4,13 +4,14 @@
 // First-time interactive onboarding tour (Phase 2).
 //
 // Rendered by `OnboardingTrigger` (see sibling file) only when the current
-// user has no `pra:onboarded:${userId}` localStorage flag yet. Shows 6 static
-// screens introducing the app, then marks the flag and unmounts — either
-// because the user finished the last screen or hit "דלג" (skip). Both paths
-// end in the exact same state, per spec.
+// user has no `pra:onboarded:${userId}` localStorage flag yet. Shows a series
+// of static screens introducing the app (count driven by the `screens` array
+// built in `buildScreens`, currently 7), then marks the flag and unmounts —
+// either because the user finished the last screen or hit "דלג" (skip). Both
+// paths end in the exact same state, per spec.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { Panel } from "@/components/ui/Panel";
@@ -116,11 +117,31 @@ function buildScreens(onCta: () => void): Screen[] {
       ),
     },
     {
-      title: "ניתוח יד",
+      title: "ניתוח מהיר",
+      content: (
+        <div className="space-y-4">
+          <div className="flex justify-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent/10">
+              <NavIcon icon="target" className="h-7 w-7 text-accent" />
+            </div>
+          </div>
+          <p className="text-sm leading-relaxed text-base-text/90">
+            הכנס את הקלפים שלך ואת הפלופ וקבל מיד אחוזים בסיסיים ותמונה ראשונית.
+          </p>
+          <div className="flex items-center justify-center gap-2 pt-1">
+            <MiniCard label="A♠" />
+            <MiniCard label="K♥" red />
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "ניתוח מתקדם",
       content: (
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-base-text/90">
-            כל ניתוח יד עובר אשף קצר של 5 שלבים — מסוג המשחק ועד לתוצאות המלאות:
+            הוסף טווח יריב, קופה, פוזיציות ומהלכים כדי לקבל ניתוח עמוק יותר. הניתוח המתקדם עובר
+            אשף קצר של 5 שלבים — מסוג המשחק ועד לתוצאות המלאות:
           </p>
           <div className="flex flex-wrap gap-2">
             <MiniStep n={1} label="סוג משחק" />
@@ -128,10 +149,6 @@ function buildScreens(onCta: () => void): Screen[] {
             <MiniStep n={3} label="פוט והחלטה" />
             <MiniStep n={4} label="טווח היריב" />
             <MiniStep n={5} label="תוצאות" />
-          </div>
-          <div className="flex items-center justify-center gap-2 pt-1">
-            <MiniCard label="A♠" />
-            <MiniCard label="K♥" red />
           </div>
         </div>
       ),
@@ -207,9 +224,6 @@ function buildScreens(onCta: () => void): Screen[] {
   ];
 }
 
-const TOTAL = 6;
-const LAST = TOTAL - 1;
-
 const variants: Variants = {
   enter: (direction: number) => ({ opacity: 0, x: direction * -24 }),
   center: { opacity: 1, x: 0 },
@@ -237,13 +251,19 @@ export function OnboardingTour({ userId, onDone }: { userId: string; onDone: () 
     router.push("/analyze");
   };
 
+  // Total screen count is derived from the screens array itself (not hardcoded) so the progress
+  // indicator ("X/N" + dot row) automatically stays correct as screens are added or removed.
+  const screens = useMemo(() => buildScreens(goToAnalyze), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const total = screens.length;
+  const last = total - 1;
+
   const handleNext = () => {
-    if (screen === LAST) {
+    if (screen === last) {
       goToAnalyze();
       return;
     }
     setDirection(1);
-    setScreen((s) => Math.min(s + 1, LAST));
+    setScreen((s) => Math.min(s + 1, last));
   };
 
   const handlePrev = () => {
@@ -281,7 +301,6 @@ export function OnboardingTour({ userId, onDone }: { userId: string; onDone: () 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen]);
 
-  const screens = buildScreens(goToAnalyze);
   const current = screens[screen] ?? screens[0]!;
   const transition = reducedMotion ? { duration: 0 } : { duration: 0.18, ease: "easeOut" as const };
 
@@ -298,10 +317,10 @@ export function OnboardingTour({ userId, onDone }: { userId: string; onDone: () 
         <div className="flex items-center justify-between gap-3 border-b border-base-border px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="text-xs tabular-nums text-base-muted">
-              {screen + 1}/{TOTAL}
+              {screen + 1}/{total}
             </span>
             <div className="flex items-center gap-1">
-              {Array.from({ length: TOTAL }).map((_, i) => (
+              {Array.from({ length: total }).map((_, i) => (
                 <span
                   key={i}
                   className={
@@ -313,7 +332,7 @@ export function OnboardingTour({ userId, onDone }: { userId: string; onDone: () 
               ))}
             </div>
           </div>
-          {screen < LAST && (
+          {screen < last && (
             <Button variant="ghost" size="sm" onClick={finish} className="text-base-muted">
               דלג
             </Button>
@@ -342,7 +361,7 @@ export function OnboardingTour({ userId, onDone }: { userId: string; onDone: () 
             הקודם
           </Button>
           <Button variant="primary" size="md" onClick={handleNext}>
-            {screen === LAST ? "בואו נתחיל" : "הבא"}
+            {screen === last ? "בואו נתחיל" : "הבא"}
           </Button>
         </div>
       </Panel>

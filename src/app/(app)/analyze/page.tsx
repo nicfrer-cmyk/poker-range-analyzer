@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Step1GameType } from "@/components/wizard/Step1GameType";
 import { Step2Cards } from "@/components/wizard/Step2Cards";
 import { Step3PotDecision } from "@/components/wizard/Step3PotDecision";
@@ -22,6 +23,7 @@ import { CoachPanel } from "@/components/analysis/CoachPanel";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Panel, PanelBody } from "@/components/ui/Panel";
+import { PaywallModal } from "@/components/billing/PaywallModal";
 import { useAnalysisStore } from "@/lib/store/analysisStore";
 import { runAnalysis, computeMatrixEquities, computeNextCardOutlook } from "@/lib/analysisEngine";
 import { parseRange, removeConflicts } from "@/lib/engine/range";
@@ -36,9 +38,27 @@ const TOTAL_STEPS = 5;
 
 type EntryMode = "choice" | "quick" | "advanced";
 
+function isEntryMode(value: string | null): value is Exclude<EntryMode, "choice"> {
+  return value === "quick" || value === "advanced";
+}
+
 export default function AnalyzePage() {
+  return (
+    <Suspense fallback={null}>
+      <AnalyzePageInner />
+    </Suspense>
+  );
+}
+
+function AnalyzePageInner() {
   const { input } = useAnalysisStore();
-  const [mode, setMode] = useState<EntryMode>("choice");
+  const searchParams = useSearchParams();
+  // Deep-link from the dashboard ("?mode=quick" / "?mode=advanced") skips the choice screen and
+  // drops the user straight into that mode; any other/missing value falls back to "choice" as before.
+  const [mode, setMode] = useState<EntryMode>(() => {
+    const requestedMode = searchParams.get("mode");
+    return isEntryMode(requestedMode) ? requestedMode : "choice";
+  });
   const [step, setStep] = useState(1);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [matrixEquities, setMatrixEquities] = useState<Record<string, number>>({});
@@ -226,16 +246,11 @@ export default function AnalyzePage() {
                 </Button>
               </div>
 
-              {gateMessage && (
-                <Panel className="border-status-risky/40">
-                  <PanelBody className="flex flex-wrap items-center justify-between gap-3 py-3">
-                    <span className="text-sm text-status-risky">{gateMessage}</span>
-                    <a href="/billing">
-                      <Button size="sm">שדרוג לפרו</Button>
-                    </a>
-                  </PanelBody>
-                </Panel>
-              )}
+              <PaywallModal
+                open={!!gateMessage}
+                message={gateMessage ?? ""}
+                onClose={() => setGateMessage(null)}
+              />
 
               {computing && !result && (
                 <Panel>

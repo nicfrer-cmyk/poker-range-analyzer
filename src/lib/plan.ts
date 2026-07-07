@@ -18,8 +18,10 @@
 export type Plan = "FREE" | "PRO";
 
 export interface PlanLimits {
-  /** Hand analyses a user can run per day. -1 = unlimited. */
+  /** Advanced (5-step wizard) hand analyses a user can run per day. -1 = unlimited. */
   dailyAnalysisLimit: number;
+  /** Quick Analysis (hero cards + flop, no villain range) runs a user can do per day. -1 = unlimited. */
+  dailyQuickAnalysisLimit: number;
   /** Total saved hand analyses a user may keep. -1 = unlimited. */
   maxSavedHands: number;
   /** Hand history imports per day. -1 = unlimited. */
@@ -46,7 +48,8 @@ export interface PlanLimits {
 
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   FREE: {
-    dailyAnalysisLimit: 10,
+    dailyAnalysisLimit: 3,
+    dailyQuickAnalysisLimit: 10,
     maxSavedHands: 25,
     dailyImportLimit: 5,
     bulkImportAllowed: false,
@@ -63,6 +66,7 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   },
   PRO: {
     dailyAnalysisLimit: -1,
+    dailyQuickAnalysisLimit: -1,
     maxSavedHands: -1,
     dailyImportLimit: -1,
     bulkImportAllowed: true,
@@ -100,6 +104,7 @@ export function hasReachedLimit(current: number, limit: number): boolean {
  */
 export type PlanAction =
   | "runAnalysis"
+  | "runQuickAnalysis"
   | "saveHand"
   | "importHand"
   | "bulkImportHands"
@@ -140,7 +145,14 @@ export function canPerformAction(
       return checkLimit(
         currentUsage,
         limits.dailyAnalysisLimit,
-        "הגעת למגבלת הניתוחים היומית בתוכנית החינמית."
+        "הגעת למגבלת הניתוחים המתקדמים היומית בתוכנית החינמית."
+      );
+
+    case "runQuickAnalysis":
+      return checkLimit(
+        currentUsage,
+        limits.dailyQuickAnalysisLimit,
+        "הגעת למגבלת הניתוחים המהירים היומית בתוכנית החינמית."
       );
 
     case "saveHand":
@@ -232,6 +244,8 @@ function usageLimitFor(action: PlanAction, limits: PlanLimits): number | undefin
   switch (action) {
     case "runAnalysis":
       return limits.dailyAnalysisLimit;
+    case "runQuickAnalysis":
+      return limits.dailyQuickAnalysisLimit;
     case "saveHand":
       return limits.maxSavedHands;
     case "importHand":
