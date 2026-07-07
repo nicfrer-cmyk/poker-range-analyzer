@@ -19,11 +19,37 @@ import { PLAN_LIMITS, isUnlimited, type Plan } from "@/lib/plan";
  * exactly as long as the underlying fact is still true.
  */
 
+/** Stable per-notification kind, distinct from `NotificationCategory` (the 4 user-mutable
+ *  mute-toggles below) — this exists purely so the /notifications page can offer a "filter by
+ *  type" dropdown covering all 8 notification-producing functions, not just the 4 that happen
+ *  to have a settings toggle. */
+export type NotificationKind =
+  | "returnToApp"
+  | "streak"
+  | "achievement"
+  | "missionReminder"
+  | "usageNudge"
+  | "improvement"
+  | "weeklyReport"
+  | "highSeverityLeak";
+
+export const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
+  returnToApp: "חזרה לאפליקציה",
+  streak: "רצף למידה",
+  achievement: "הישג",
+  missionReminder: "משימה יומית",
+  usageNudge: "מגבלת חינמי",
+  improvement: "שיפור",
+  weeklyReport: "דוח שבועי",
+  highSeverityLeak: "דליפה",
+};
+
 export interface AppNotification {
   id: string;
   message: string;
   href: string;
   createdAt: number;
+  kind: NotificationKind;
 }
 
 function toDateKey(timestamp: number | string): string {
@@ -62,6 +88,7 @@ function noHandsTodayNotification(hands: StoredHand[]): AppNotification | null {
     message: "לא ניתחת אף יד היום",
     href: "/analyze",
     createdAt: startOfDayMs(today),
+    kind: "returnToApp",
   };
 }
 
@@ -74,6 +101,7 @@ function streakMilestoneNotification(hands: StoredHand[]): AppNotification | nul
     message: `השגת רצף של ${milestone} ימים`,
     href: "/",
     createdAt: Date.now(),
+    kind: "streak",
   };
 }
 
@@ -90,6 +118,7 @@ function achievementNotifications(input: AchievementsInput): AppNotification[] {
       message: `נפתח הישג חדש: ${a.label}`,
       href: "/missions",
       createdAt: Date.now(),
+      kind: "achievement" as const,
     }));
 }
 
@@ -106,6 +135,7 @@ function missionReminderNotification(hands: StoredHand[], skillTree: SkillTreeRe
     message: "יש לך משימת לימוד חדשה להיום",
     href: "/missions",
     createdAt: startOfDayMs(today),
+    kind: "missionReminder",
   };
 }
 
@@ -126,6 +156,7 @@ function usageNudgeNotification(plan: Plan, todayAnalysisCount: number): AppNoti
     message: `ניתחת ${todayAnalysisCount} מתוך ${limit} הידיים היומיות בתוכנית החינמית`,
     href: "/billing",
     createdAt: Date.now(),
+    kind: "usageNudge",
   };
 }
 
@@ -145,6 +176,7 @@ function improvementNotification(hands: StoredHand[]): AppNotification | null {
     message: `השתפרת ב-${label} השבוע`,
     href: "/weekly-review",
     createdAt: Date.now(),
+    kind: "improvement",
   };
 }
 
@@ -164,6 +196,7 @@ function weeklyReportNotification(hands: StoredHand[]): AppNotification | null {
     message: "הדוח השבועי שלך מוכן",
     href: "/weekly-review",
     createdAt: new Date(`${thisWeekKey}T00:00:00.000Z`).getTime(),
+    kind: "weeklyReport",
   };
 }
 
@@ -178,6 +211,7 @@ function highSeverityLeakNotification(hands: StoredHand[]): AppNotification | nu
     message: "זוהתה דליפה חדשה ברמת חומרה גבוהה",
     href: "/leaks",
     createdAt: Date.now(),
+    kind: "highSeverityLeak",
   };
 }
 

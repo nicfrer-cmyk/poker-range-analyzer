@@ -16,6 +16,7 @@ import { createSession } from "@/lib/localSessionStore";
 import { useMockPlan } from "@/lib/useMockPlan";
 import { canPerformAction, isNearLimit } from "@/lib/plan";
 import { getTodayCount, incrementToday } from "@/lib/usageTracker";
+import { track } from "@/lib/analytics";
 
 function defaultSessionName(): string {
   return `ייבוא מ-${new Date().toLocaleDateString("he-IL")}`;
@@ -156,7 +157,7 @@ export function HandHistoryImporter() {
         <Panel className="border-status-risky/40">
           <PanelBody className="flex flex-wrap items-center justify-between gap-3 py-3">
             <span className="text-sm text-status-risky">{gateMessage}</span>
-            <a href="/billing">
+            <a href="/billing" onClick={() => track("upgrade_clicked", { source: "importer" })}>
               <Button size="sm">שדרוג לפרו</Button>
             </a>
           </PanelBody>

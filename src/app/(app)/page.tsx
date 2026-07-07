@@ -15,9 +15,18 @@ import { computeSkillTree } from "@/lib/coach/skillTree";
 import { computePokerDNA } from "@/lib/coach/dna";
 import { computePokerIQ, recordIqSnapshotIfNeeded, getIqHistory, getWeeklyDelta } from "@/lib/coach/iq";
 import { generateDailyMissions, type Mission } from "@/lib/coach/missions";
+import { buildWeeklyReview } from "@/lib/coach/weeklyReview";
+import {
+  computeNotifications,
+  visibleNotifications,
+  getNotificationSettings,
+  type AppNotification,
+} from "@/lib/notifications";
 import { createClient } from "@/lib/supabase/client";
 import { getTipOfTheDay } from "@/lib/tipOfTheDay";
+import { getTodayCount } from "@/lib/usageTracker";
 import { useMockPlan } from "@/lib/useMockPlan";
+import { track } from "@/lib/analytics";
 
 function greeting(): string {
   const hour = new Date().getHours();
@@ -39,12 +48,27 @@ export default function DashboardPage() {
   const [hands, setHands] = useState<StoredHand[]>([]);
   const [progress, setProgress] = useState<TrainingProgress | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [plan] = useMockPlan();
 
   useEffect(() => {
     setHands(listHands());
     setProgress(loadProgress());
   }, []);
+
+  // Same computeNotifications/visibleNotifications reuse as NotificationBell, so the dashboard's
+  // "התראות אחרונות" card always agrees with the bell's dropdown for the same underlying data.
+  useEffect(() => {
+    const settings = getNotificationSettings();
+    const items = visibleNotifications(
+      computeNotifications(hands, {
+        plan,
+        todayAnalysisCount: getTodayCount("analysis"),
+        ...settings,
+      })
+    );
+    setNotifications(items);
+  }, [hands, plan]);
 
   useEffect(() => {
     try {
@@ -85,6 +109,9 @@ export default function DashboardPage() {
   }, [iq, hands.length]);
 
   const weeklyDelta = iq ? getWeeklyDelta(getIqHistory(), iq.score) : null;
+  // Same buildWeeklyReview() call the /weekly-review page makes, with the same iqWeeklyDelta
+  // input, so the dashboard's headline numbers always match the full report.
+  const weeklyReview = useMemo(() => buildWeeklyReview(hands, weeklyDelta), [hands, weeklyDelta]);
   const topMission = missions[0];
   const weakestTrackId = skillTree?.weakestDomain?.recommendationTrackId ?? null;
 
@@ -112,6 +139,49 @@ export default function DashboardPage() {
           <span className="text-base-muted">{tip}</span>
         </PanelBody>
       </Panel>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {notifications.length > 0 && (
+          <Panel>
+            <PanelHeader>
+              <PanelTitle>התראות אחרונות</PanelTitle>
+              <Link href="/notifications" className="text-xs text-accent-soft">
+                לכל ההתראות ←
+              </Link>
+            </PanelHeader>
+            <PanelBody className="space-y-2">
+              {notifications.slice(0, 3).map((n) => (
+                <Link
+                  key={n.id}
+                  href={n.href}
+                  className="block rounded-lg border border-base-border px-3 py-2 text-sm text-base-text transition-colors hover:border-accent/60 hover:bg-base-panel2"
+                >
+                  {n.message}
+                </Link>
+              ))}
+            </PanelBody>
+          </Panel>
+        )}
+
+        <Panel>
+          <PanelHeader>
+            <PanelTitle>דוח שבועי</PanelTitle>
+            <Link href="/weekly-review" className="text-xs text-accent-soft">
+              לצפייה בדוח המלא ←
+            </Link>
+          </PanelHeader>
+          <PanelBody className="flex flex-wrap items-center gap-6">
+            <div>
+              <p className="text-xs text-base-muted">ידיים השבוע</p>
+              <p className="text-2xl font-bold">{weeklyReview.weekHandCount}</p>
+            </div>
+            <div>
+              <p className="text-xs text-base-muted">דיוק החלטות השבוע</p>
+              <p className="text-2xl font-bold text-status-ahead">{Math.round(weeklyReview.weekAccuracyPct)}%</p>
+            </div>
+          </PanelBody>
+        </Panel>
+      </div>
 
       {!hasData ? (
         <Panel>
@@ -362,7 +432,10 @@ export default function DashboardPage() {
                     שדרוג לפרו פותח ניתוחים בלתי מוגבלים, טווח מול טווח, ICM ועוד.
                   </p>
                 </div>
-                <Link href="/billing">
+                <Link
+                  href="/billing"
+                  onClick={() => track("upgrade_clicked", { source: "dashboard_upsell" })}
+                >
                   <Button variant="secondary">שדרוג לפרו</Button>
                 </Link>
               </PanelBody>

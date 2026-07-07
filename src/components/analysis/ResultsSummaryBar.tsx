@@ -1,7 +1,16 @@
 import { Panel, PanelBody } from "@/components/ui/Panel";
+import { Badge } from "@/components/ui/Badge";
 import { PlayingCard } from "@/components/cards/PlayingCard";
 import type { AnalysisInput } from "@/lib/store/analysisStore";
 import type { StatusTone } from "@/lib/statusTone";
+
+/** Derived from board length, not stored separately — 0/3/4/5 board cards map 1:1 to a street. */
+function streetLabel(boardLength: number): string {
+  if (boardLength >= 5) return "ריבר";
+  if (boardLength === 4) return "טרן";
+  if (boardLength === 3) return "פלופ";
+  return "פרה-פלופ";
+}
 
 function Stat({
   value,
@@ -79,6 +88,9 @@ export function ResultsSummaryBar({
               </div>
             </>
           )}
+          <Badge tone="neutral" className="shrink-0">
+            {streetLabel(board.length)}
+          </Badge>
         </div>
 
         <div className="flex items-center justify-center gap-5">

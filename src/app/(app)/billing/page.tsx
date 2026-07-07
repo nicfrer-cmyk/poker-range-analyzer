@@ -31,6 +31,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { PLAN_LIMITS, type Plan } from "@/lib/plan";
 import { PRO_PRICING_ILS, type BillingInterval } from "@/lib/grow/plans";
+import { track } from "@/lib/analytics";
 
 function getOrigin(): string {
   const headerList = headers();
@@ -42,6 +43,11 @@ function getOrigin(): string {
 /** Server Action: POSTs to our own checkout route, then redirects. */
 async function upgradeToPro(interval: BillingInterval) {
   "use server";
+
+  // Fires on every submit of either plan-card button — this Server Action is the only code that
+  // runs when either "upgrade to pro" form is submitted, so it's the natural (if server-side)
+  // stand-in for an onClick.
+  track("upgrade_clicked", { source: "billing_page", interval });
 
   const cookieHeader = cookies()
     .getAll()
@@ -75,6 +81,10 @@ async function upgradeToPro(interval: BillingInterval) {
   }
 
   if (successUrl) {
+    // "Checkout session created," not "payment actually completed" — that would require the
+    // Grow webhook, which is a deliberate no-op stub until its verification mechanism is
+    // confirmed (see src/app/api/grow/webhook/route.ts's header comment).
+    track("subscription_started", { interval });
     redirect(successUrl);
   }
   redirect(`/billing?checkout=error&message=${encodeURIComponent(errorMessage ?? "התשלום נכשל.")}`);

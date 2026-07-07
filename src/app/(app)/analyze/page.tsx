@@ -33,6 +33,7 @@ import { saveHand, listHands } from "@/lib/localHandStore";
 import { useMockPlan } from "@/lib/useMockPlan";
 import { canPerformAction, isNearLimit } from "@/lib/plan";
 import { getTodayCount, incrementToday } from "@/lib/usageTracker";
+import { track } from "@/lib/analytics";
 
 const TOTAL_STEPS = 5;
 
@@ -89,6 +90,14 @@ function AnalyzePageInner() {
 
   const nearAnalysisLimit = isNearLimit(plan, "runAnalysis", getTodayCount("analysis"));
 
+  // Fires whenever the user enters advanced mode (mirrors QuickAnalysis's mount-based
+  // `quick_analysis_started`) — including a deep-link landing directly on `?mode=advanced`,
+  // since `mode`'s initial state already reflects that on first render.
+  useEffect(() => {
+    if (mode === "advanced") track("advanced_analysis_started");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
   useEffect(() => {
     if (step !== 5 || !readyToAnalyze) return;
 
@@ -108,6 +117,9 @@ function AnalyzePageInner() {
     const timeout = setTimeout(() => {
       const r = runAnalysis(input);
       setResult(r);
+      if (r) {
+        track("advanced_analysis_completed");
+      }
       if (r && !alreadyCounted) {
         incrementToday("analysis");
         countedHandKey.current = handKey;
@@ -284,7 +296,9 @@ function AnalyzePageInner() {
                           result,
                           action: input.actionTaken,
                           position: input.heroPosition,
+                          analysisMode: "advanced",
                         });
+                        track("hand_saved", { analysisMode: "advanced" });
                         setSaved(true);
                       }}
                     >

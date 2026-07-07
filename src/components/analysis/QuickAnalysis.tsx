@@ -7,56 +7,34 @@ import { CardPicker } from "@/components/cards/CardPicker";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { ResultsSummaryBar, type ResultsSummaryStats } from "@/components/analysis/ResultsSummaryBar";
+import { HeroSummary } from "@/components/analysis/HeroSummary";
 import { PaywallModal } from "@/components/billing/PaywallModal";
 import { useAnalysisStore } from "@/lib/store/analysisStore";
 import { runAnalysis, outsFromDraws } from "@/lib/analysisEngine";
-import { classifyHand, type MadeTier } from "@/lib/engine/classify";
-import { MADE_TIER_LABEL, drawsToHebrew } from "@/lib/labels";
+import { classifyHand } from "@/lib/engine/classify";
+import { drawsToHebrew } from "@/lib/labels";
+import { rangeSelectionPercent } from "@/lib/rangeStats";
 import type { Card, Combo } from "@/lib/engine/types";
 import type { AnalysisResult } from "@/lib/analysisTypes";
-import type { StatusTone } from "@/lib/statusTone";
 import { saveHand, listHands } from "@/lib/localHandStore";
 import { canPerformAction, isNearLimit } from "@/lib/plan";
 import { useMockPlan } from "@/lib/useMockPlan";
 import { getTodayCount, incrementToday } from "@/lib/usageTracker";
+import { track } from "@/lib/analytics";
 
 type PickerTarget = { kind: "hero"; index: 0 | 1 } | { kind: "board"; indices: number[] };
-
-/** Nut-ish tiers -> "crushing", strong made hands -> "ahead", marginal made hands -> "close",
- *  air -> "risky" if it at least has a live draw, otherwise "behind". This is a display-only
- *  heuristic for coloring the strength badge; it is not used anywhere in the actual equity math. */
-const PREMIUM_TIERS = new Set<MadeTier>([
-  "straight-flush",
-  "quads",
-  "full-house",
-  "flush",
-  "straight",
-  "set",
-  "trips",
-]);
-const GOOD_TIERS = new Set<MadeTier>(["two-pair", "overpair", "top-pair"]);
-
-function tierTone(tier: MadeTier, hasDraw: boolean): StatusTone {
-  if (PREMIUM_TIERS.has(tier)) return "crushing";
-  if (GOOD_TIERS.has(tier)) return "ahead";
-  if (tier === "air") return hasDraw ? "risky" : "behind";
-  return "close"; // second-pair, bottom-pair, underpair, overcards
-}
 
 /**
  * Fast entry point: hero's 2 cards + the flop (turn/river optional), no villain range, no
  * position, no pot sizing. Auto-computes as soon as hero + flop are filled.
  *
- * Equity-vs-classification choice: Quick Analysis intentionally does NOT show a hero-vs-villain
- * equity percentage. There is no villain range for the user to type in this mode, so any
- * head-to-head number would have to be computed against either a made-up "default" range or an
- * unlabeled leftover value in the store — both are misleading since the user never chose an
- * opponent assumption. Instead we show a hand-strength classification (via classifyHand, which
- * only looks at hero cards + board, no opponent needed at all) plus live draw/outs — an honest
- * "what do I actually have" read. `runAnalysis` is still run under the hood (against whatever
- * villain range currently lives in the shared store, usually its untouched default) purely so
- * `saveHand` and "continue to advanced" get a fully-formed AnalysisResult to work with, exactly
- * like the advanced wizard produces — that hidden number is never surfaced in this mode's UI.
+ * Equity display: computed against the store's default villain range (a standard opening range
+ * — see `initialInput.villainRangeText` in analysisStore), not a range the user chose. That
+ * assumption is called out explicitly in the caption above HeroSummary below, and "continue to
+ * advanced" lets the user swap in the villain's real range. This replaces an earlier version
+ * that hid the equity number entirely to avoid implying a tailored read — but a labeled
+ * "vs. a typical range" number is honest AND gives the same rich equity-gauge/star-rating
+ * readout the advanced flow produces (HeroSummary), instead of a bare made-hand-tier sentence.
  */
 export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: () => void }) {
   const { input, setHeroCard, setBoardCard, removeBoardCard, usedCards } = useAnalysisStore();
@@ -87,6 +65,13 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
     getTodayCount("quickAnalysis")
   );
 
+  // Fires once when this component enters "quick analysis" mode (it's only ever rendered while
+  // that mode is selected on the analyze page), not merely on module load.
+  useEffect(() => {
+    track("quick_analysis_started");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (!readyForQuick || !heroCombo) {
       setResult(null);
@@ -106,6 +91,9 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
     const timeout = setTimeout(() => {
       const r = runAnalysis(input);
       setResult(r);
+      if (r) {
+        track("quick_analysis_completed");
+      }
       if (r && !alreadyCounted) {
         incrementToday("quickAnalysis");
         countedHandKey.current = handKey;
@@ -121,22 +109,16 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
   const outs = classification ? outsFromDraws(classification.draws) : 0;
   const hasLiveDraw = !!classification && classification.draws.length > 0 && outs > 0;
 
-  const stats: ResultsSummaryStats | null = classification
+  const stats: ResultsSummaryStats | null = result
     ? {
-        kind: "strength",
-        label: MADE_TIER_LABEL[classification.madeTier],
-        tone: tierTone(classification.madeTier, hasLiveDraw),
+        kind: "equity",
+        heroEquityPct: result.heroEquityPct,
+        villainEquityPct: result.villainEquityPct,
         outs: hasLiveDraw ? outs : undefined,
       }
     : null;
 
-  const description = classification
-    ? classification.draws.length > 0
-      ? `היד שלך: ${MADE_TIER_LABEL[classification.madeTier]}, עם ${drawsToHebrew(
-          classification.draws
-        )} (כ-${outs} אאוטים לשיפור).`
-      : `היד שלך: ${MADE_TIER_LABEL[classification.madeTier]}.`
-    : null;
+  const villainRangePercent = rangeSelectionPercent(input.villainRangeText);
 
   const pick = (card: string) => {
     if (!pickerTarget) return;
@@ -180,7 +162,14 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
       return;
     }
     setSaveMessage(null);
-    saveHand({ input, result, action: input.actionTaken, position: input.heroPosition });
+    saveHand({
+      input,
+      result,
+      action: input.actionTaken,
+      position: input.heroPosition,
+      analysisMode: "quick",
+    });
+    track("hand_saved", { analysisMode: "quick" });
     setSaved(true);
   };
 
@@ -192,9 +181,7 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
         onClose={() => setPaywallMessage(null)}
       />
 
-      {stats && (
-        <ResultsSummaryBar input={input} stats={stats} />
-      )}
+      {stats && <ResultsSummaryBar input={input} stats={stats} />}
 
       {!paywallMessage && nearQuickAnalysisLimit && (
         <div className="flex justify-end">
@@ -273,24 +260,40 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
         </Panel>
       )}
 
-      {readyForQuick && description && (
+      {readyForQuick && computing && !result && (
         <Panel>
-          <PanelBody className="space-y-4">
-            <p className="text-sm text-base-text">{description}</p>
-
-            {saveMessage && <p className="text-sm text-status-risky">{saveMessage}</p>}
-
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {computing && !result && (
-                <span className="text-xs text-base-muted">מכין נתונים לשמירה…</span>
-              )}
-              <Button variant="secondary" onClick={handleSave} disabled={!result}>
-                {saved ? "נשמר ✓" : "שמור יד"}
-              </Button>
-              <Button onClick={onContinueToAdvanced}>המשך לניתוח מתקדם</Button>
-            </div>
-          </PanelBody>
+          <PanelBody className="py-8 text-center text-sm text-base-muted">מחשב אקוויטי…</PanelBody>
         </Panel>
+      )}
+
+      {readyForQuick && result && (
+        <>
+          <Panel className="border-accent/30">
+            <PanelBody className="py-2.5 text-xs text-base-muted">
+              מוצג מול טווח יריב סטנדרטי ({villainRangePercent.toFixed(0)}% מהידיים האפשריות) — לניתוח
+              מדויק עם הטווח האמיתי של היריב שלך, המשך לניתוח מתקדם.
+            </PanelBody>
+          </Panel>
+
+          <HeroSummary result={result} />
+
+          {classification && classification.draws.length > 0 && (
+            <Panel>
+              <PanelBody className="text-sm text-base-text">
+                יש לך גם דרואו חי ({drawsToHebrew(classification.draws)}) בשווי של כ-{outs} אאוטים לשיפור.
+              </PanelBody>
+            </Panel>
+          )}
+
+          {saveMessage && <p className="text-sm text-status-risky">{saveMessage}</p>}
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button variant="secondary" onClick={handleSave}>
+              {saved ? "נשמר ✓" : "שמור יד"}
+            </Button>
+            <Button onClick={onContinueToAdvanced}>המשך לניתוח מתקדם</Button>
+          </div>
+        </>
       )}
     </div>
   );

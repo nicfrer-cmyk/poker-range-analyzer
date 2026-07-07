@@ -4,11 +4,17 @@ import { useEffect, useState } from "react";
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { PaywallModal } from "@/components/billing/PaywallModal";
 import { listHands, type StoredHand } from "@/lib/localHandStore";
 import { buildHandSummary } from "@/lib/handSummary";
 import { useMockPlan } from "@/lib/useMockPlan";
 import { canPerformAction } from "@/lib/plan";
 import { getTodayCount, incrementToday } from "@/lib/usageTracker";
+import { track } from "@/lib/analytics";
+
+const PAYWALL_TITLE = "פתח את המאמן האישי המלא שלך";
+const PAYWALL_BODY =
+  "כבר התחלת לנתח ידיים. שדרוג ל-Pro יפתח לך ניתוחים ללא הגבלה, דוחות מלאים, זיהוי דפוסים ותוכנית לימוד אישית.";
 
 function ReviewText({ text }: { text: string }) {
   const lines = text.split("\n");
@@ -41,6 +47,7 @@ export default function AiReviewPage() {
   const [loading, setLoading] = useState(false);
   const [review, setReview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [paywallOpen, setPaywallOpen] = useState(false);
   const [plan] = useMockPlan();
 
   useEffect(() => {
@@ -53,7 +60,7 @@ export default function AiReviewPage() {
 
     const gate = canPerformAction(plan, "runAiReview", getTodayCount("ai-review"));
     if (!gate.allowed) {
-      setError(gate.reason ?? "הגעת למגבלת ניתוחי ה-AI היומית.");
+      setPaywallOpen(true);
       return;
     }
 
@@ -155,13 +162,24 @@ export default function AiReviewPage() {
           <PanelBody className="flex flex-wrap items-center justify-between gap-3 py-3">
             <span className="text-sm text-status-risky">{error}</span>
             {error.includes("מפתח") ? null : (
-              <a href="/billing">
+              <a href="/billing" onClick={() => track("upgrade_clicked", { source: "ai_review" })}>
                 <Button size="sm">שדרוג לפרו</Button>
               </a>
             )}
           </PanelBody>
         </Panel>
       )}
+
+      <PaywallModal
+        open={paywallOpen}
+        title={PAYWALL_TITLE}
+        message={PAYWALL_BODY}
+        primaryLabel="שדרג לפרו"
+        secondaryLabel="המשך בחינם"
+        onSecondaryClick={() => {}}
+        hideFooterNote
+        onClose={() => setPaywallOpen(false)}
+      />
 
       {review && (
         <Panel className="border-accent/30 bg-gradient-to-br from-accent/5 to-transparent">

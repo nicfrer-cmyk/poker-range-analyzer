@@ -16,6 +16,7 @@ import { listRanges, clearAllRanges } from "@/lib/localRangeStore";
 import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/lib/supabase/auth-actions";
 import { canPerformAction } from "@/lib/plan";
+import { track } from "@/lib/analytics";
 
 function exportAllData() {
   const payload = {
@@ -170,7 +171,11 @@ export default function SettingsPage() {
           ) : (
             <p className="text-sm text-base-muted">
               אין לך מנוי פרו פעיל כרגע.{" "}
-              <Link href="/billing" className="text-accent-soft underline">
+              <Link
+                href="/billing"
+                className="text-accent-soft underline"
+                onClick={() => track("upgrade_clicked", { source: "settings_manage_plan" })}
+              >
                 אפשר לשדרג לפרו כאן
               </Link>
               .
@@ -311,7 +316,10 @@ export default function SettingsPage() {
           {exportGateMessage && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-status-risky/40 bg-status-risky/10 px-3 py-2">
               <span className="text-sm text-status-risky">{exportGateMessage}</span>
-              <Link href="/billing">
+              <Link
+                href="/billing"
+                onClick={() => track("upgrade_clicked", { source: "settings_export_gate" })}
+              >
                 <Button size="sm">שדרוג לפרו</Button>
               </Link>
             </div>

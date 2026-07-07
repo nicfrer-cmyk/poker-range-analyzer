@@ -28,8 +28,18 @@ export interface PlanLimits {
   dailyImportLimit: number;
   /** Whether bulk (multi-file / multi-hand) import is allowed at all. */
   bulkImportAllowed: boolean;
-  /** Leak finder / session review — Pro-only feature, fully locked on Free. */
+  /**
+   * Whether the leak finder shows its FULL breakdown (detailed leak list — severity, trend,
+   * example hands). Free always sees a teaser (KPI row + street heat-map); this flag only
+   * controls whether the deep-dive list unlocks, not whether the page itself is reachable.
+   */
   leakFinderEnabled: boolean;
+  /**
+   * Whether the weekly report shows its FULL breakdown (improved/needs-work lists + next-week
+   * goals). Free always sees the summary line and top-line KPIs; this flag only controls
+   * whether the deep-dive sections unlock, not whether the page itself is reachable.
+   */
+  weeklyReportFullEnabled: boolean;
   /** Range-vs-range analysis — Pro-only feature. */
   rangeVsRangeEnabled: boolean;
   /** ICM calculator — Pro-only feature. */
@@ -53,9 +63,12 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     maxSavedHands: 25,
     dailyImportLimit: 5,
     bulkImportAllowed: false,
-    // Leak finder / personal-coach dashboard (DNA, IQ, skill tree, missions, roadmap) is a core
-    // free-tier pillar of the "personal coach" positioning, not a Pro differentiator.
-    leakFinderEnabled: true,
+    // Policy reversal: leak finder's full breakdown and the full weekly report are now Pro
+    // differentiators (were previously fully open on Free). Free still gets a teaser view of
+    // each — see the field docs on `PlanLimits` above and the page-level gating in
+    // `leaks/page.tsx` / `weekly-review/page.tsx`.
+    leakFinderEnabled: false,
+    weeklyReportFullEnabled: false,
     rangeVsRangeEnabled: false,
     icmEnabled: false,
     dailyAiReviewLimit: 1,
@@ -71,6 +84,7 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     dailyImportLimit: -1,
     bulkImportAllowed: true,
     leakFinderEnabled: true,
+    weeklyReportFullEnabled: true,
     rangeVsRangeEnabled: true,
     icmEnabled: true,
     dailyAiReviewLimit: -1,
@@ -109,6 +123,7 @@ export type PlanAction =
   | "importHand"
   | "bulkImportHands"
   | "useLeakFinder"
+  | "viewFullWeeklyReport"
   | "useRangeVsRange"
   | "useIcmCalculator"
   | "runAiReview"
@@ -178,7 +193,13 @@ export function canPerformAction(
     case "useLeakFinder":
       return checkFeature(
         limits.leakFinderEnabled,
-        "גילוי דליפות וסקירת סשן זמינים רק במנוי פרו."
+        "גילוי הדליפות המלא זמין רק במנוי פרו."
+      );
+
+    case "viewFullWeeklyReport":
+      return checkFeature(
+        limits.weeklyReportFullEnabled,
+        "הדוח השבועי המלא זמין רק במנוי פרו."
       );
 
     case "useRangeVsRange":
@@ -256,6 +277,7 @@ function usageLimitFor(action: PlanAction, limits: PlanLimits): number | undefin
       return limits.maxOpponentProfiles;
     case "bulkImportHands":
     case "useLeakFinder":
+    case "viewFullWeeklyReport":
     case "useRangeVsRange":
     case "useIcmCalculator":
     case "exportData":

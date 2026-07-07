@@ -3,6 +3,7 @@ import { signUpWithEmail, signInWithOAuth } from "@/lib/supabase/auth-actions";
 import { Button } from "@/components/ui/Button";
 import { Panel, PanelBody } from "@/components/ui/Panel";
 import { PasswordField } from "@/components/auth/PasswordField";
+import { track } from "@/lib/analytics";
 
 export default function SignupPage({
   searchParams,
@@ -11,6 +12,10 @@ export default function SignupPage({
 }) {
   async function action(formData: FormData) {
     "use server";
+    // Fires once per real submit attempt (this only runs on an actual form POST, never on
+    // render). `signup_completed` isn't tracked here — `signUpWithEmail` redirects internally on
+    // success, so this function never regains control in that case; see AuthSync.tsx instead.
+    track("signup_started");
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
     const consent = formData.get("consent");

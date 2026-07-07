@@ -13,10 +13,13 @@ import {
   visibleNotifications,
   dismissNotification,
   getNotificationSettings,
+  NOTIFICATION_KIND_LABEL,
   type AppNotification,
+  type NotificationKind,
 } from "@/lib/notifications";
 import { useMockPlan } from "@/lib/useMockPlan";
 import { getTodayCount } from "@/lib/usageTracker";
+import { track } from "@/lib/analytics";
 
 /** Small local Hebrew relative-time helper — day-granularity ("היום"/"אתמול"/"לפני X ימים"),
  *  distinct from NotificationBell.tsx's minute/hour-granularity version since this page is meant
@@ -29,9 +32,12 @@ function relativeDayHe(ts: number): string {
   return `לפני ${diffDays} ימים`;
 }
 
+type KindFilter = "all" | NotificationKind;
+
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [plan] = useMockPlan();
 
   const refresh = () => {
@@ -60,14 +66,34 @@ export default function NotificationsPage() {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
+  const filtered = kindFilter === "all" ? notifications : notifications.filter((n) => n.kind === kindFilter);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">התראות</h1>
           <p className="mt-1 text-sm text-base-muted">כל ההתראות הפעילות כרגע, לא רק האחרונות שבתפריט הנפתח.</p>
         </div>
-        <Badge tone="neutral">{notifications.length}</Badge>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-base-muted" htmlFor="notification-kind-filter">
+            סוג
+          </label>
+          <select
+            id="notification-kind-filter"
+            value={kindFilter}
+            onChange={(e) => setKindFilter(e.target.value as KindFilter)}
+            className="rounded-lg border border-base-border bg-base-panel2 px-2.5 py-1.5 text-sm text-base-text outline-none focus:border-accent"
+          >
+            <option value="all">הכול</option>
+            {(Object.keys(NOTIFICATION_KIND_LABEL) as NotificationKind[]).map((kind) => (
+              <option key={kind} value={kind}>
+                {NOTIFICATION_KIND_LABEL[kind]}
+              </option>
+            ))}
+          </select>
+          <Badge tone="neutral">{filtered.length}</Badge>
+        </div>
       </div>
 
       <Panel>
@@ -75,10 +101,12 @@ export default function NotificationsPage() {
           <PanelTitle>הכל</PanelTitle>
         </PanelHeader>
         <PanelBody className="space-y-2">
-          {notifications.length === 0 ? (
-            <p className="py-8 text-center text-sm text-base-muted">אין התראות פעילות כרגע.</p>
+          {filtered.length === 0 ? (
+            <p className="py-8 text-center text-sm text-base-muted">
+              {notifications.length === 0 ? "אין התראות פעילות כרגע." : "אין התראות מהסוג הזה כרגע."}
+            </p>
           ) : (
-            notifications.map((n) => {
+            filtered.map((n) => {
               const isRead = readIds.has(n.id);
               return (
                 <div
@@ -87,12 +115,21 @@ export default function NotificationsPage() {
                     isRead ? "border-base-border" : "border-accent/50 bg-accent/5"
                   }`}
                 >
-                  <Link href={n.href} className="min-w-0 flex-1">
+                  <Link
+                    href={n.href}
+                    className="min-w-0 flex-1"
+                    onClick={() => track("notification_opened", { kind: n.kind, id: n.id })}
+                  >
                     <div className="flex items-center gap-2">
                       {!isRead && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true" />}
                       <p className="text-base-text">{n.message}</p>
                     </div>
-                    <p className="mt-1 text-[11px] text-base-muted">{relativeDayHe(n.createdAt)}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Badge tone="neutral" className="px-1.5 py-0 text-[10px]">
+                        {NOTIFICATION_KIND_LABEL[n.kind]}
+                      </Badge>
+                      <p className="text-[11px] text-base-muted">{relativeDayHe(n.createdAt)}</p>
+                    </div>
                   </Link>
                   <Button variant="ghost" size="sm" onClick={() => handleDismiss(n.id)}>
                     מחיקה

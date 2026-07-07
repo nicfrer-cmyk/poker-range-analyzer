@@ -61,6 +61,36 @@ function insideSpade(x, y) {
 const HEART_CENTER_Y = 0.12;
 const SPADE_CENTER_Y = -0.23;
 
+// Shortest distance from point (px,py) to segment (ax,ay)-(bx,by).
+function distToSegment(px, py, ax, ay, bx, by) {
+  const abx = bx - ax;
+  const aby = by - ay;
+  const abLen2 = abx * abx + aby * aby;
+  let t = abLen2 > 0 ? ((px - ax) * abx + (py - ay) * aby) / abLen2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  const cx = ax + t * abx;
+  const cy = ay + t * aby;
+  const dx = px - cx;
+  const dy = py - cy;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+// Bold sans-serif "A" as three thick strokes (two legs + a crossbar), in a
+// y-up unit box (apex at top, feet at bottom), so cards clearly read as aces.
+function insideLetterA(x, y, strokeHalf) {
+  const apex = [0, 1];
+  const footL = [-0.95, -1];
+  const footR = [0.95, -1];
+  const barY = -0.12;
+  const t = (1 - barY) / 2;
+  const barL = [apex[0] + t * (footL[0] - apex[0]), barY];
+  const barR = [apex[0] + t * (footR[0] - apex[0]), barY];
+  const dLegL = distToSegment(x, y, apex[0], apex[1], footL[0], footL[1]);
+  const dLegR = distToSegment(x, y, apex[0], apex[1], footR[0], footR[1]);
+  const dBar = distToSegment(x, y, barL[0], barL[1], barR[0], barR[1]);
+  return Math.min(dLegL, dLegR, dBar) <= strokeHalf;
+}
+
 function rotate(px, py, angle) {
   const c = Math.cos(-angle);
   const s = Math.sin(-angle);
@@ -107,7 +137,11 @@ function makePng(size) {
     const [ccx, ccy] = card.center;
     const halfW = cardW / 2;
     const halfH = cardH / 2;
-    const pipScale = cardH * 0.24;
+    const letterScale = cardH * 0.28;
+    const letterCenterY = 0.12; // y-up fine-tune to visually center the "A"
+    const letterOffsetY = -cardH * 0.1; // image y-down: shift glyph up a bit
+    const pipScale = cardH * 0.14;
+    const pipOffsetY = cardH * 0.29; // image y-down: small pip sits below the "A"
 
     const minX = Math.max(0, Math.floor(ccx - cardH));
     const maxX = Math.min(size - 1, Math.ceil(ccx + cardH));
@@ -124,10 +158,15 @@ function makePng(size) {
         if (sd > -border) {
           color = cardBorder;
         } else {
-          const nx = lx / pipScale;
-          const ny = card.centerY - ly / pipScale; // flip image-down to y-up, centered on glyph
-          const inPip = card.pip === "heart" ? insideHeart(nx, ny) : insideSpade(nx, ny);
-          if (inPip) color = card.color;
+          const anx = lx / letterScale;
+          const any = letterCenterY - (ly - letterOffsetY) / letterScale;
+          let hit = insideLetterA(anx, any, 0.17);
+          if (!hit) {
+            const pnx = lx / pipScale;
+            const pny = card.centerY - (ly - pipOffsetY) / pipScale; // flip image-down to y-up, centered on glyph
+            hit = card.pip === "heart" ? insideHeart(pnx, pny) : insideSpade(pnx, pny);
+          }
+          if (hit) color = card.color;
         }
         pixels[y * size + x] = color;
       }

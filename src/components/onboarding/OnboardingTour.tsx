@@ -18,6 +18,7 @@ import { Panel } from "@/components/ui/Panel";
 import { Button } from "@/components/ui/Button";
 import { NavIcon } from "@/components/layout/NavIcon";
 import type { NavItem } from "@/lib/nav";
+import { track } from "@/lib/analytics";
 
 function onboardedFlag(userId: string) {
   return `pra:onboarded:${userId}`;
@@ -97,18 +98,17 @@ type Screen = {
   content: React.ReactNode;
 };
 
-function buildScreens(onCta: () => void): Screen[] {
+function buildScreens(onStartAnalysis: () => void, onGoDashboard: () => void): Screen[] {
   return [
     {
-      title: "ברוכים הבאים",
+      title: "ברוך הבא למאמן הניתוח האישי שלך",
       content: (
         <div className="space-y-4 text-center">
           <div className="text-5xl" aria-hidden>
             ♠️
           </div>
           <p className="text-sm leading-relaxed text-base-text/90">
-            מנתח טווחי הפוקר עוזר לך להבין ולשפר את המשחק שלך <b>אחרי</b> שהסשן נגמר — לא תוך כדי
-            משחק. מעלים יד, בודקים אותה לעומק, ולומדים ממנה לקראת הפעם הבאה.
+            האפליקציה עוזרת לנתח ידיים <b>לאחר</b> המשחק, להבין החלטות ולזהות דפוסים חוזרים.
           </p>
           <p className="text-sm leading-relaxed text-base-muted">
             אין כאן שום סיוע בזמן משחק חי, בכוונה תחילה. זהו כלי לימוד וניתוח שלאחר המשחק בלבד.
@@ -126,7 +126,7 @@ function buildScreens(onCta: () => void): Screen[] {
             </div>
           </div>
           <p className="text-sm leading-relaxed text-base-text/90">
-            הכנס את הקלפים שלך ואת הפלופ וקבל מיד אחוזים בסיסיים ותמונה ראשונית.
+            בחר את הקלפים שלך ואת הפלופ וקבל אחוזים ותובנה בסיסית תוך כמה שניות.
           </p>
           <div className="flex items-center justify-center gap-2 pt-1">
             <MiniCard label="A♠" />
@@ -140,84 +140,64 @@ function buildScreens(onCta: () => void): Screen[] {
       content: (
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-base-text/90">
-            הוסף טווח יריב, קופה, פוזיציות ומהלכים כדי לקבל ניתוח עמוק יותר. הניתוח המתקדם עובר
-            אשף קצר של 5 שלבים — מסוג המשחק ועד לתוצאות המלאות:
+            הוסף טווח יריב, פוזיציות, קופה ומהלכים כדי לקבל ניתוח עמוק יותר.
           </p>
           <div className="flex flex-wrap gap-2">
-            <MiniStep n={1} label="סוג משחק" />
-            <MiniStep n={2} label="קלפים" />
-            <MiniStep n={3} label="פוט והחלטה" />
-            <MiniStep n={4} label="טווח היריב" />
-            <MiniStep n={5} label="תוצאות" />
+            <MiniStep n={1} label="פוזיציות" />
+            <MiniStep n={2} label="קופה" />
+            <MiniStep n={3} label="טווח יריב" />
+            <MiniStep n={4} label="מהלכים" />
           </div>
         </div>
       ),
     },
     {
-      title: "בניית טווחים",
+      title: "שמירת ידיים ודוחות",
       content: (
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-base-text/90">
-            כדי לנתח יד לעומק, בונים טווח ליריב על גבי רשת 13×13 שמייצגת את כל צירופי הקלפים
-            האפשריים — זוגות, ידיים מתאימות ולא מתאימות.
-          </p>
-          <RangeGridPreview />
-          <p className="text-center text-xs text-base-muted">
-            כל תא ברשת מייצג צירוף ידיים אחד — סימון פשוט וויזואלי של הטווח שהיריב עשוי לשחק איתו.
-          </p>
-        </div>
-      ),
-    },
-    {
-      title: "המאמן האישי",
-      content: (
-        <div className="space-y-4">
-          <p className="text-sm leading-relaxed text-base-text/90">
-            עם כל יד ש<b>את/ה</b> שומר/ת, המאמן האישי לומד ומצטבר לאורך זמן — זה לא ציון חד-פעמי,
-            אלא תמונה שמתעדכנת ומתחדדת ככל שתנתחו יותר ידיים:
+            שמור ידיים, הוסף תגיות והערות, וקבל סיכומים שעוזרים להבין דפוסים לאורך זמן.
           </p>
           <div className="grid grid-cols-2 gap-2.5">
-            <CoachFeature icon="target" title="דליפות" desc="זיהוי דפוסי טעויות חוזרים" />
-            <CoachFeature icon="dna" title="DNA שלי" desc="פרופיל הסגנון שלך" />
-            <CoachFeature icon="brain" title="Poker IQ" desc="ציון הבנה שמתעדכן" />
-            <CoachFeature icon="checklist" title="משימות יומיות" desc="תרגול ממוקד לשיפור" />
+            <CoachFeature icon="book" title="ספריית ידיים" desc="תגיות והערות אישיות" />
+            <CoachFeature icon="chart" title="דוחות וסיכומים" desc="דפוסים לאורך זמן" />
           </div>
         </div>
       ),
     },
     {
-      title: "ניתוח יד עם AI",
+      title: "התראות חכמות",
       content: (
         <div className="space-y-4">
           <div className="flex justify-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent/10">
-              <NavIcon icon="book" className="h-7 w-7 text-accent" />
+              <NavIcon icon="bell" className="h-7 w-7 text-accent" />
             </div>
           </div>
           <p className="text-sm leading-relaxed text-base-text/90">
-            עבור יד ספציפית ששמרת, ה-AI כותב עבורך סקירה מפורטת בכתב — מה היה טוב בהחלטות, מה היה
-            אפשר לשפר, ולמה.
-          </p>
-          <p className="text-sm leading-relaxed text-base-muted">
-            גם כאן — זו תמיד סקירה שלאחר המשחק. לעולם לא ייעוץ או המלצה בזמן אמת תוך כדי יד חיה.
+            המערכת תזכיר לך לחזור ללמידה, תציג דוחות ותציע משימות בהתאם לשימוש שלך.
           </p>
         </div>
       ),
     },
     {
-      title: "מוכנים להתחיל?",
+      title: "מוכן להתחיל?",
       content: (
         <div className="space-y-5 text-center">
           <div className="text-5xl" aria-hidden>
             🚀
           </div>
           <p className="text-sm leading-relaxed text-base-text/90">
-            עכשיו כשהכרתם את הכלים, הדרך הכי טובה להתחיל היא לנתח יד אחת אמיתית ולראות איך זה
-            עובד.
+            עכשיו כשהכרתם את הכלים, אפשר להתחיל לנתח יד ראשונה או לצפות בדשבורד האישי.
           </p>
-          <Button variant="primary" size="lg" onClick={onCta} className="w-full">
-            נתח את היד הראשונה שלי
-          </Button>
+          <div className="flex flex-col gap-2.5">
+            <Button variant="primary" size="lg" onClick={onStartAnalysis} className="w-full">
+              התחל ניתוח מהיר
+            </Button>
+            <Button variant="secondary" size="lg" onClick={onGoDashboard} className="w-full">
+              עבור לדשבורד
+            </Button>
+          </div>
         </div>
       ),
     },
@@ -237,12 +217,13 @@ export function OnboardingTour({ userId, onDone }: { userId: string; onDone: () 
   const [direction, setDirection] = useState(1);
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  const finish = () => {
+  const finish = (reason: "completed" | "skipped" = "completed") => {
     try {
       window.localStorage.setItem(onboardedFlag(userId), "1");
     } catch {
       // localStorage unavailable — nothing to persist, just close.
     }
+    track(reason === "skipped" ? "onboarding_skipped" : "onboarding_completed");
     onDone();
   };
 
@@ -251,9 +232,14 @@ export function OnboardingTour({ userId, onDone }: { userId: string; onDone: () 
     router.push("/analyze");
   };
 
+  const goToDashboard = () => {
+    finish();
+    router.push("/");
+  };
+
   // Total screen count is derived from the screens array itself (not hardcoded) so the progress
   // indicator ("X/N" + dot row) automatically stays correct as screens are added or removed.
-  const screens = useMemo(() => buildScreens(goToAnalyze), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const screens = useMemo(() => buildScreens(goToAnalyze, goToDashboard), []); // eslint-disable-line react-hooks/exhaustive-deps
   const total = screens.length;
   const last = total - 1;
 
@@ -281,6 +267,13 @@ export function OnboardingTour({ userId, onDone }: { userId: string; onDone: () 
     };
   }, []);
 
+  // Fires once when the tour actually mounts/renders (it's only ever conditionally rendered by
+  // `OnboardingTrigger` for a user with no `pra:onboarded:${userId}` flag yet), not on module load.
+  useEffect(() => {
+    track("onboarding_started");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       // RTL: reading flows right-to-left, so ArrowLeft continues forward
@@ -293,7 +286,7 @@ export function OnboardingTour({ userId, onDone }: { userId: string; onDone: () 
         handlePrev();
       } else if (e.key === "Escape") {
         e.preventDefault();
-        finish();
+        finish("skipped");
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -333,7 +326,12 @@ export function OnboardingTour({ userId, onDone }: { userId: string; onDone: () 
             </div>
           </div>
           {screen < last && (
-            <Button variant="ghost" size="sm" onClick={finish} className="text-base-muted">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => finish("skipped")}
+              className="text-base-muted"
+            >
               דלג
             </Button>
           )}

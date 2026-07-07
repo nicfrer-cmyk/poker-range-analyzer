@@ -33,6 +33,10 @@ export interface StoredHand extends SavedHandRecord {
    *  Manually-entered or older hands simply omit this; the Hand Replay player falls back to
    *  an equity-only walkthrough when it's missing. */
   streetActions?: ActionEntry[];
+  /** Which flow the user saved the hand from — the Quick Analysis panel or the Advanced
+   *  Analysis wizard. Undefined on records saved before this field existed; treat as unknown
+   *  rather than backfilling a guess. */
+  analysisMode?: "quick" | "advanced";
 }
 
 export type MistakeTag = "good" | "mistake" | "review";
@@ -99,6 +103,7 @@ export function saveHand({
   source = "manual",
   sessionId,
   streetActions,
+  analysisMode,
 }: {
   input: AnalysisInput;
   result: AnalysisResult;
@@ -108,6 +113,7 @@ export function saveHand({
   source?: "manual" | "imported";
   sessionId?: string;
   streetActions?: ActionEntry[];
+  analysisMode?: "quick" | "advanced";
 }): StoredHand {
   const hands = readAll();
   const record: StoredHand = {
@@ -129,6 +135,7 @@ export function saveHand({
     source,
     sessionId,
     streetActions,
+    analysisMode,
   };
   hands.push(record);
   writeAll(hands);

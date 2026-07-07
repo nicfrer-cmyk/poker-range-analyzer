@@ -3,6 +3,7 @@ import { BottomNav } from "./BottomNav";
 import { PostGameNotice } from "./PostGameNotice";
 import { AuthSync } from "./AuthSync";
 import { NotificationBell } from "./NotificationBell";
+import { ProfileMenu } from "./ProfileMenu";
 import { OnboardingTrigger } from "@/components/onboarding/OnboardingTrigger";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -13,8 +14,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="min-w-0 flex-1">
         <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 md:px-8 md:pb-10">
-          <div className="mb-3 flex items-center justify-end">
+          <div className="mb-3 flex items-center justify-end gap-2">
             <NotificationBell />
+            <ProfileMenu />
           </div>
           <PostGameNotice className="mb-4" />
           {children}

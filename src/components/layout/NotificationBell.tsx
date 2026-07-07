@@ -15,6 +15,7 @@ import {
 } from "@/lib/notifications";
 import { useMockPlan } from "@/lib/useMockPlan";
 import { getTodayCount } from "@/lib/usageTracker";
+import { track } from "@/lib/analytics";
 
 function relativeTimeHe(ts: number): string {
   const diffMs = Date.now() - ts;
@@ -92,7 +93,10 @@ export function NotificationBell() {
                     <Link
                       key={n.id}
                       href={n.href}
-                      onClick={() => setOpen(false)}
+                      onClick={() => {
+                        track("notification_opened", { kind: n.kind, id: n.id });
+                        setOpen(false);
+                      }}
                       className="block rounded-lg border border-base-border p-2.5 text-sm transition-colors hover:border-accent/60 hover:bg-base-panel2"
                     >
                       <p className="text-base-text">{n.message}</p>

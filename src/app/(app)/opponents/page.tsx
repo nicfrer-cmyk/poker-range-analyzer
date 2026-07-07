@@ -18,6 +18,7 @@ import {
 import { listHands, updateHand, type StoredHand } from "@/lib/localHandStore";
 import { useMockPlan } from "@/lib/useMockPlan";
 import { canPerformAction } from "@/lib/plan";
+import { track } from "@/lib/analytics";
 
 export default function OpponentsPage() {
   const [opponents, setOpponents] = useState<StoredOpponent[]>([]);
@@ -123,7 +124,7 @@ export default function OpponentsPage() {
         <Panel className="border-status-risky/40">
           <PanelBody className="flex flex-wrap items-center justify-between gap-3 py-3">
             <span className="text-sm text-status-risky">{gateMessage}</span>
-            <a href="/billing">
+            <a href="/billing" onClick={() => track("upgrade_clicked", { source: "opponents_page" })}>
               <Button size="sm">שדרוג לפרו</Button>
             </a>
           </PanelBody>

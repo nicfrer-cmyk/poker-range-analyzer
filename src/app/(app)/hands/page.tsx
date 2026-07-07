@@ -23,9 +23,23 @@ import { MADE_TIER_LABEL } from "@/lib/labels";
 import type { StatusTone } from "@/lib/statusTone";
 import { useMockPlan } from "@/lib/useMockPlan";
 import { canPerformAction } from "@/lib/plan";
+import { track } from "@/lib/analytics";
 
 /** Shortcuts for the free-text tag input — not the only allowed tags, just a quick-add. */
-const QUICK_TAGS = ["אגרסיבי", "בלאף", "קריאה אמיצה", "קולר", "משחק שגוי", "לבדיקה חוזרת"];
+const QUICK_TAGS = [
+  "אגרסיבי",
+  "בלאף",
+  "קריאה אמיצה",
+  "קולר",
+  "משחק שגוי",
+  "לבדיקה חוזרת",
+  "הושלם",
+];
+
+const ANALYSIS_MODE_LABEL: Record<"quick" | "advanced", string> = {
+  quick: "מהיר",
+  advanced: "מתקדם",
+};
 
 const STREET_LABEL: Record<string, string> = {
   preflop: "פרה-פלופ",
@@ -47,6 +61,8 @@ const MISTAKE_TAG_TONE: Record<MistakeTag, StatusTone> = {
 
 type TagFilter = "all" | MistakeTag;
 type StreetFilter = "all" | "preflop" | "flop" | "turn" | "river";
+type AnalysisModeFilter = "all" | "quick" | "advanced";
+type HandCategoryFilter = "all" | keyof typeof MADE_TIER_LABEL;
 
 export default function HandsLibraryPage() {
   const [hands, setHands] = useState<StoredHand[]>([]);
@@ -55,6 +71,10 @@ export default function HandsLibraryPage() {
   const [streetFilter, setStreetFilter] = useState<StreetFilter>("all");
   const [minEquity, setMinEquity] = useState(0);
   const [maxEquity, setMaxEquity] = useState(100);
+  const [analysisModeFilter, setAnalysisModeFilter] = useState<AnalysisModeFilter>("all");
+  const [handCategoryFilter, setHandCategoryFilter] = useState<HandCategoryFilter>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [tagDrafts, setTagDrafts] = useState<Record<string, string>>({});
@@ -86,9 +106,29 @@ export default function HandsLibraryPage() {
       if (streetFilter !== "all" && h.street !== streetFilter) return false;
       const equityPct = h.equityAtDecision * 100;
       if (equityPct < minEquity || equityPct > maxEquity) return false;
+      if (analysisModeFilter !== "all" && h.analysisMode !== analysisModeFilter) return false;
+      if (handCategoryFilter !== "all" && h.handCategory !== handCategoryFilter) return false;
+      if (dateFrom || dateTo) {
+        const handTime = Number(h.timestamp);
+        if (dateFrom && handTime < new Date(dateFrom).getTime()) return false;
+        if (dateTo && handTime > new Date(dateTo).getTime() + 24 * 60 * 60 * 1000 - 1) {
+          return false;
+        }
+      }
       return true;
     });
-  }, [hands, query, tagFilter, streetFilter, minEquity, maxEquity]);
+  }, [
+    hands,
+    query,
+    tagFilter,
+    streetFilter,
+    minEquity,
+    maxEquity,
+    analysisModeFilter,
+    handCategoryFilter,
+    dateFrom,
+    dateTo,
+  ]);
 
   const startEditingNote = (h: StoredHand) => {
     setExpandedId(h.id);
@@ -107,6 +147,7 @@ export default function HandsLibraryPage() {
     const hand = hands.find((h) => h.id === id);
     if (!hand || hand.tags.includes(value)) return;
     updateHand(id, { tags: [...hand.tags, value] });
+    track("tag_added", { tag: value });
     setHands(listHands());
   };
 
@@ -200,7 +241,7 @@ export default function HandsLibraryPage() {
         <Panel className="border-status-risky/40">
           <PanelBody className="flex flex-wrap items-center justify-between gap-3 py-3">
             <span className="text-sm text-status-risky">{gateMessage}</span>
-            <a href="/billing">
+            <a href="/billing" onClick={() => track("upgrade_clicked", { source: "hands_page" })}>
               <Button size="sm">שדרוג לפרו</Button>
             </a>
           </PanelBody>
@@ -267,7 +308,60 @@ export default function HandsLibraryPage() {
               className="w-20 rounded-lg border border-base-border bg-base-panel2 px-2.5 py-2 text-sm outline-none focus:border-accent"
             />
           </div>
-          {(tagFilter !== "all" || streetFilter !== "all" || minEquity !== 0 || maxEquity !== 100 || query) && (
+          <div className="space-y-1">
+            <label className="text-xs text-base-muted">סוג ניתוח</label>
+            <select
+              value={analysisModeFilter}
+              onChange={(e) => setAnalysisModeFilter(e.target.value as AnalysisModeFilter)}
+              className="rounded-lg border border-base-border bg-base-panel2 px-2.5 py-2 text-sm outline-none focus:border-accent"
+            >
+              <option value="all">הכול</option>
+              <option value="quick">{ANALYSIS_MODE_LABEL.quick}</option>
+              <option value="advanced">{ANALYSIS_MODE_LABEL.advanced}</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-base-muted">חוזק יד</label>
+            <select
+              value={handCategoryFilter}
+              onChange={(e) => setHandCategoryFilter(e.target.value as HandCategoryFilter)}
+              className="rounded-lg border border-base-border bg-base-panel2 px-2.5 py-2 text-sm outline-none focus:border-accent"
+            >
+              <option value="all">הכול</option>
+              {Object.entries(MADE_TIER_LABEL).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-base-muted">מתאריך</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="rounded-lg border border-base-border bg-base-panel2 px-2.5 py-2 text-sm outline-none focus:border-accent"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-base-muted">עד תאריך</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="rounded-lg border border-base-border bg-base-panel2 px-2.5 py-2 text-sm outline-none focus:border-accent"
+            />
+          </div>
+          {(tagFilter !== "all" ||
+            streetFilter !== "all" ||
+            minEquity !== 0 ||
+            maxEquity !== 100 ||
+            analysisModeFilter !== "all" ||
+            handCategoryFilter !== "all" ||
+            dateFrom ||
+            dateTo ||
+            query) && (
             <Button
               variant="ghost"
               size="sm"
@@ -277,6 +371,10 @@ export default function HandsLibraryPage() {
                 setStreetFilter("all");
                 setMinEquity(0);
                 setMaxEquity(100);
+                setAnalysisModeFilter("all");
+                setHandCategoryFilter("all");
+                setDateFrom("");
+                setDateTo("");
               }}
             >
               איפוס סינון
@@ -340,6 +438,9 @@ export default function HandsLibraryPage() {
                       <Badge tone={h.source === "imported" ? "close" : "neutral"}>
                         {SOURCE_LABEL[h.source] ?? h.source}
                       </Badge>
+                      {h.analysisMode && (
+                        <Badge tone="neutral">{ANALYSIS_MODE_LABEL[h.analysisMode]}</Badge>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <Link href={`/hands/${h.id}`}>

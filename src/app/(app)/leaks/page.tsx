@@ -12,14 +12,22 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel";
+import { Button } from "@/components/ui/Button";
 import { Badge, equityTone } from "@/components/ui/Badge";
+import { PaywallModal } from "@/components/billing/PaywallModal";
 import { listHands, type StoredHand } from "@/lib/localHandStore";
 import { computeSessionStats, topLeaks, leaksByStreet, type TopLeak, type DecisionStreet } from "@/lib/engine/leakFinder";
 import { formatLeakKey, LEAK_DIMENSION_LABEL, STREET_LABEL } from "@/lib/labels";
 import { trendFor, type TrendDirection } from "@/lib/coach/weeklyReview";
 import { useTheme } from "@/lib/useTheme";
+import { useMockPlan } from "@/lib/useMockPlan";
+import { canPerformAction } from "@/lib/plan";
 import { cn } from "@/lib/utils/cn";
 import type { StatusTone } from "@/lib/statusTone";
+
+const PAYWALL_TITLE = "פתח את המאמן האישי המלא שלך";
+const PAYWALL_BODY =
+  "כבר התחלת לנתח ידיים. שדרוג ל-Pro יפתח לך ניתוחים ללא הגבלה, דוחות מלאים, זיהוי דפוסים ותוכנית לימוד אישית.";
 
 // Mirrors globals.css CSS variables per theme — recharts axis/grid/line colors need plain
 // rgb() strings, Tailwind classes don't apply to SVG stroke attributes.
@@ -84,6 +92,8 @@ export default function LeaksPage() {
   const [theme] = useTheme();
   const chartColors = CHART_COLORS[theme];
   const [hands, setHands] = useState<StoredHand[]>([]);
+  const [plan] = useMockPlan();
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   useEffect(() => {
     setHands(listHands());
@@ -92,6 +102,7 @@ export default function LeaksPage() {
   const stats = useMemo(() => computeSessionStats(hands), [hands]);
   const leaks = useMemo(() => topLeaks(hands, 8), [hands]);
   const streetGroups = useMemo(() => leaksByStreet(hands), [hands]);
+  const fullLeakViewAllowed = canPerformAction(plan, "useLeakFinder").allowed;
 
   if (hands.length === 0) {
     return (
@@ -201,43 +212,97 @@ export default function LeaksPage() {
         </PanelHeader>
         <PanelBody className="space-y-4">
           {leaks.length === 0 && <p className="text-sm text-base-muted">לא זוהו דליפות משמעותיות — כל הכבוד.</p>}
-          {leaks.map((leak) => {
-            const trend = trendFor(hands, leak);
-            return (
-              <div key={`${leak.dimension}-${leak.key}`} className="rounded-lg border border-base-border p-3">
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Badge tone="behind">{LEAK_DIMENSION_LABEL[leak.dimension] ?? leak.dimension}</Badge>
-                    <span className="text-sm font-semibold">{formatLeakKey(leak.dimension, leak.key)}</span>
-                    <span className="text-xs text-status-risky" title="חומרה">
-                      {"★".repeat(severityStars(leak))}
-                      <span className="text-base-border">{"★".repeat(5 - severityStars(leak))}</span>
-                    </span>
+
+          {leaks.length > 0 && !fullLeakViewAllowed && (
+            <>
+              {/* Free teaser: reveal only the single most severe leak's dimension/key, without the
+                  explanation text or example hands, so Free users see *that* there's a real finding
+                  worth upgrading for rather than a generic placeholder. */}
+              {(() => {
+                const topLeak = leaks[0];
+                if (!topLeak) return null;
+                const trend = trendFor(hands, topLeak);
+                return (
+                  <div className="rounded-lg border border-base-border p-3">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Badge tone="behind">{LEAK_DIMENSION_LABEL[topLeak.dimension] ?? topLeak.dimension}</Badge>
+                        <span className="text-sm font-semibold">{formatLeakKey(topLeak.dimension, topLeak.key)}</span>
+                        <span className="text-xs text-status-risky" title="חומרה">
+                          {"★".repeat(severityStars(topLeak))}
+                          <span className="text-base-border">{"★".repeat(5 - severityStars(topLeak))}</span>
+                        </span>
+                      </div>
+                      <Badge tone={TREND_TONE[trend]}>{TREND_LABEL[trend]}</Badge>
+                    </div>
+                    <p className="text-sm text-base-muted">
+                      זו הדליפה החמורה ביותר שזיהינו. שדרג לפרו כדי לראות את ההסבר המלא, ידיים לדוגמה,
+                      ועד {Math.max(0, leaks.length - 1)} דליפות נוספות שזיהינו.
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge tone="neutral">{leak.count} ידיים</Badge>
-                    <Badge tone={TREND_TONE[trend]}>{TREND_LABEL[trend]}</Badge>
+                );
+              })()}
+              <Panel className="border-accent/30 bg-accent/5">
+                <PanelBody className="flex flex-wrap items-center justify-between gap-3 py-3">
+                  <span className="text-sm text-base-text">שדרג לפרו לצפייה בכל הדליפות שזוהו</span>
+                  <Button size="sm" onClick={() => setPaywallOpen(true)}>
+                    שדרג לפרו
+                  </Button>
+                </PanelBody>
+              </Panel>
+            </>
+          )}
+
+          {leaks.length > 0 &&
+            fullLeakViewAllowed &&
+            leaks.map((leak) => {
+              const trend = trendFor(hands, leak);
+              return (
+                <div key={`${leak.dimension}-${leak.key}`} className="rounded-lg border border-base-border p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Badge tone="behind">{LEAK_DIMENSION_LABEL[leak.dimension] ?? leak.dimension}</Badge>
+                      <span className="text-sm font-semibold">{formatLeakKey(leak.dimension, leak.key)}</span>
+                      <span className="text-xs text-status-risky" title="חומרה">
+                        {"★".repeat(severityStars(leak))}
+                        <span className="text-base-border">{"★".repeat(5 - severityStars(leak))}</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge tone="neutral">{leak.count} ידיים</Badge>
+                      <Badge tone={TREND_TONE[trend]}>{TREND_LABEL[trend]}</Badge>
+                    </div>
+                  </div>
+                  <p className="text-sm text-base-text">{leakExplanation(leak)}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {leak.examples.map((ex) => {
+                      const stored = ex as StoredHand;
+                      return (
+                        <Link key={stored.id} href={`/hands/${stored.id}`}>
+                          <Badge tone={equityTone(ex.equityAtDecision * 100)} className="cursor-pointer">
+                            {ex.heroCards.join(" ")} · {STREET_LABEL[ex.street] ?? ex.street} ·{" "}
+                            {(ex.equityAtDecision * 100).toFixed(0)}%
+                          </Badge>
+                        </Link>
+                      );
+                    })}
                   </div>
                 </div>
-                <p className="text-sm text-base-text">{leakExplanation(leak)}</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {leak.examples.map((ex) => {
-                    const stored = ex as StoredHand;
-                    return (
-                      <Link key={stored.id} href={`/hands/${stored.id}`}>
-                        <Badge tone={equityTone(ex.equityAtDecision * 100)} className="cursor-pointer">
-                          {ex.heroCards.join(" ")} · {STREET_LABEL[ex.street] ?? ex.street} ·{" "}
-                          {(ex.equityAtDecision * 100).toFixed(0)}%
-                        </Badge>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
         </PanelBody>
       </Panel>
+
+      <PaywallModal
+        open={paywallOpen}
+        title={PAYWALL_TITLE}
+        message={PAYWALL_BODY}
+        primaryLabel="שדרג לפרו"
+        secondaryLabel="המשך בחינם"
+        onSecondaryClick={() => {}}
+        hideFooterNote
+        onClose={() => setPaywallOpen(false)}
+      />
     </div>
   );
 }
