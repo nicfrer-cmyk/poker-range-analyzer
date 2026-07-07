@@ -33,6 +33,7 @@ export type AnalyticsEvent =
   | "hand_saved"
   | "tag_added"
   | "notification_opened"
+  | "screenshot_parsed"
   | "paywall_viewed"
   | "upgrade_clicked"
   | "subscription_started"

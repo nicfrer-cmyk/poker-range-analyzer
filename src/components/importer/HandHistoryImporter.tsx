@@ -70,16 +70,91 @@ function parsedHandToFullInput(hand: ParsedHand): AnalysisInput {
   };
 }
 
+/** Reads a File as a base64 string (no `data:...;base64,` prefix) via FileReader. */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("קריאת הקובץ נכשלה"));
+    reader.readAsDataURL(file);
+  });
+}
+
+interface ScreenshotParseResult {
+  heroCards?: string[];
+  board?: { flop?: string[]; turn?: string; river?: string };
+  potSize?: number;
+  heroPosition?: string;
+  error?: string;
+}
+
 export function HandHistoryImporter() {
   const router = useRouter();
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState<ParsedHand[]>([]);
   const [showScreenshotStub, setShowScreenshotStub] = useState(false);
+  const [screenshotLoading, setScreenshotLoading] = useState(false);
+  const [screenshotError, setScreenshotError] = useState<string | null>(null);
   const [plan] = useMockPlan();
   const [gateMessage, setGateMessage] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState(defaultSessionName());
   const [sessionSavedMessage, setSessionSavedMessage] = useState<string | null>(null);
   const nearImportLimit = isNearLimit(plan, "importHand", getTodayCount("import"));
+
+  const handleScreenshot = async (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+
+    const gate = canPerformAction(plan, "runAiReview", getTodayCount("ai-review"));
+    if (!gate.allowed) {
+      setScreenshotError(gate.reason ?? "הגעת למגבלת ניתוחי ה-AI היומית בתוכנית החינמית.");
+      return;
+    }
+
+    setScreenshotError(null);
+    setScreenshotLoading(true);
+    try {
+      const imageBase64 = await fileToBase64(file);
+      const res = await fetch("/api/ai/parse-screenshot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64, mediaType: file.type }),
+      });
+      const data = (await res.json()) as ScreenshotParseResult;
+      if (!res.ok) {
+        setScreenshotError(data.error ?? "ניתוח התמונה נכשל.");
+        return;
+      }
+      if (!data.heroCards && !data.board && data.potSize === undefined) {
+        setScreenshotError("לא זוהה מידע ברור בתמונה. אפשר לנסות תמונה ברורה יותר, או להדביק טקסט.");
+        return;
+      }
+
+      incrementToday("ai-review");
+      track("screenshot_parsed", { hasHeroCards: Boolean(data.heroCards) });
+      setParsed((prev) => [
+        {
+          format: "unknown",
+          seats: [],
+          heroCards: data.heroCards as ParsedHand["heroCards"],
+          heroPosition: data.heroPosition,
+          board: (data.board ?? {}) as ParsedHand["board"],
+          actions: [],
+          potSize: data.potSize,
+          raw: "",
+        },
+        ...prev,
+      ]);
+      setShowScreenshotStub(false);
+    } catch {
+      setScreenshotError("שגיאת רשת בניתוח התמונה.");
+    } finally {
+      setScreenshotLoading(false);
+    }
+  };
 
   const handleParse = () => {
     const gate = canPerformAction(plan, "importHand", getTodayCount("import"));
@@ -202,16 +277,31 @@ export function HandHistoryImporter() {
 
       {showScreenshotStub && (
         <Panel>
-          <PanelBody className="space-y-2 py-6 text-center">
-            <Badge tone="neutral">בקרוב</Badge>
+          <PanelBody className="space-y-3 py-6 text-center">
             <p className="text-sm text-base-muted">
-              ניתוח מצילום מסך דורש מודל ראייה שיודע לזהות קלפים מתוך תמונה. נקודת הכניסה הזו כבר
-              מוכנה — צריך רק לחבר API של ראייה כדי להפעיל אותה. בינתיים, הדבק את טקסט היסטוריית
-              היד למעלה.
+              העלה צילום מסך של שולחן הפוקר — Claude ינסה לזהות את קלפי ההירו, הבורד וגודל הפוט
+              אוטומטית. זיהוי אוטומטי, כדאי לבדוק את התוצאה לפני שמירה.
             </p>
-            <Button size="sm" variant="ghost" onClick={() => setShowScreenshotStub(false)}>
-              סגירה
-            </Button>
+            <div className="flex items-center justify-center gap-3">
+              <label
+                className={`cursor-pointer rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white ${
+                  screenshotLoading ? "pointer-events-none opacity-60" : ""
+                }`}
+              >
+                {screenshotLoading ? "מנתח…" : "בחירת תמונה"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  className="hidden"
+                  disabled={screenshotLoading}
+                  onChange={(e) => handleScreenshot(e.target.files)}
+                />
+              </label>
+              <Button size="sm" variant="ghost" onClick={() => setShowScreenshotStub(false)}>
+                סגירה
+              </Button>
+            </div>
+            {screenshotError && <p className="text-xs text-status-risky">{screenshotError}</p>}
           </PanelBody>
         </Panel>
       )}
