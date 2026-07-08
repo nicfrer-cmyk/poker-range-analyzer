@@ -27,8 +27,8 @@ function isConfigError(err: unknown): err is Error {
   );
 }
 
-function getOrigin(): string {
-  const headerList = headers();
+async function getOrigin(): Promise<string> {
+  const headerList = await headers();
   const host = headerList.get("x-forwarded-host") ?? headerList.get("host");
   const protocol = headerList.get("x-forwarded-proto") ?? "http";
   if (host) return `${protocol}://${host}`;
@@ -49,7 +49,7 @@ export async function signInWithEmail(
   redirectTo: string = "/"
 ): Promise<AuthActionResult> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: translateAuthError(error.message) };
   } catch (err) {
@@ -74,12 +74,12 @@ export async function signUpWithEmail(
   let hasSession = false;
 
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${getOrigin()}/auth/callback`,
+        emailRedirectTo: `${await getOrigin()}/auth/callback`,
       },
     });
     if (error) return { error: translateAuthError(error.message) };
@@ -103,11 +103,11 @@ export async function signInWithOAuth(
   let url: string | null = null;
 
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${getOrigin()}/auth/callback`,
+        redirectTo: `${await getOrigin()}/auth/callback`,
       },
     });
     if (error) return { error: translateAuthError(error.message) };
@@ -124,7 +124,7 @@ export async function signInWithOAuth(
 /** Signs the current user out and redirects to the home page. */
 export async function signOut(): Promise<AuthActionResult> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { error } = await supabase.auth.signOut();
     if (error) return { error: translateAuthError(error.message) };
   } catch (err) {
@@ -143,12 +143,12 @@ export async function signOut(): Promise<AuthActionResult> {
  */
 export async function requestPasswordReset(email: string): Promise<AuthActionResult> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     // Intentionally not surfacing Supabase's `error` (if any) to the caller — doing so could
     // let someone probe which emails have accounts. Only a config error (thrown, caught
     // below) is worth telling the caller about.
     await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${getOrigin()}/reset-password`,
+      redirectTo: `${await getOrigin()}/reset-password`,
     });
   } catch (err) {
     if (isConfigError(err)) return { error: err.message };
@@ -165,7 +165,7 @@ export async function requestPasswordReset(email: string): Promise<AuthActionRes
  */
 export async function updatePassword(password: string): Promise<AuthActionResult> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { error } = await supabase.auth.updateUser({ password });
     if (error) return { error: translateAuthError(error.message) };
   } catch (err) {

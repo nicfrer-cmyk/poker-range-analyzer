@@ -3,11 +3,12 @@ import { requestPasswordReset } from "@/lib/supabase/auth-actions";
 import { Button } from "@/components/ui/Button";
 import { Panel, PanelBody } from "@/components/ui/Panel";
 
-export default function ForgotPasswordPage({
-  searchParams,
-}: {
-  searchParams: { sent?: string };
-}) {
+export default async function ForgotPasswordPage(
+  props: {
+    searchParams: Promise<{ sent?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   async function action(formData: FormData) {
     "use server";
     const email = String(formData.get("email") ?? "");

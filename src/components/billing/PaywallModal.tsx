@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel";
 import { Button } from "@/components/ui/Button";
 import { track } from "@/lib/analytics";
@@ -79,23 +80,23 @@ export function PaywallModal({
             </p>
           )}
           <div className="flex flex-col gap-2 sm:flex-row-reverse">
-            <a
+            <Link
               href="/billing"
               className="w-full"
               onClick={() => track("upgrade_clicked", { source: "paywall_modal" })}
             >
               <Button className="w-full">{primaryLabel}</Button>
-            </a>
+            </Link>
             {onSecondaryClick ? (
               <Button variant="secondary" className="w-full" onClick={handleSecondary}>
                 {secondaryLabel}
               </Button>
             ) : (
-              <a href="/" className="w-full">
+              <Link href="/" className="w-full">
                 <Button variant="secondary" className="w-full">
                   {secondaryLabel}
                 </Button>
-              </a>
+              </Link>
             )}
           </div>
         </PanelBody>
