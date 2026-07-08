@@ -83,9 +83,10 @@ export default function HandsLibraryPage() {
   const [comparing, setComparing] = useState(false);
   const [plan] = useMockPlan();
   const [gateMessage, setGateMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    setHands(listHands());
+    listHands().then(setHands);
   }, []);
 
   const filtered = useMemo(() => {
@@ -135,31 +136,46 @@ export default function HandsLibraryPage() {
     setNoteDrafts((prev) => ({ ...prev, [h.id]: prev[h.id] ?? h.note ?? "" }));
   };
 
-  const saveNote = (id: string) => {
-    updateHand(id, { note: noteDrafts[id] ?? "" });
-    setHands(listHands());
-    setExpandedId(null);
+  const saveNote = async (id: string) => {
+    setActionError(null);
+    try {
+      await updateHand(id, { note: noteDrafts[id] ?? "" });
+      setHands(await listHands());
+      setExpandedId(null);
+    } catch {
+      setActionError("שגיאה בשמירת ההערה — נסה שוב.");
+    }
   };
 
-  const addTag = (id: string, raw: string) => {
+  const addTag = async (id: string, raw: string) => {
     const value = raw.trim();
     if (!value) return;
     const hand = hands.find((h) => h.id === id);
     if (!hand || hand.tags.includes(value)) return;
-    updateHand(id, { tags: [...hand.tags, value] });
-    track("tag_added", { tag: value });
-    setHands(listHands());
+    setActionError(null);
+    try {
+      await updateHand(id, { tags: [...hand.tags, value] });
+      track("tag_added", { tag: value });
+      setHands(await listHands());
+    } catch {
+      setActionError("שגיאה בהוספת התגית — נסה שוב.");
+    }
   };
 
-  const removeTag = (id: string, tagValue: string) => {
+  const removeTag = async (id: string, tagValue: string) => {
     const hand = hands.find((h) => h.id === id);
     if (!hand) return;
-    updateHand(id, { tags: hand.tags.filter((t) => t !== tagValue) });
-    setHands(listHands());
+    setActionError(null);
+    try {
+      await updateHand(id, { tags: hand.tags.filter((t) => t !== tagValue) });
+      setHands(await listHands());
+    } catch {
+      setActionError("שגיאה בהסרת התגית — נסה שוב.");
+    }
   };
 
-  const submitTagDraft = (id: string) => {
-    addTag(id, tagDrafts[id] ?? "");
+  const submitTagDraft = async (id: string) => {
+    await addTag(id, tagDrafts[id] ?? "");
     setTagDrafts((prev) => ({ ...prev, [id]: "" }));
   };
 
@@ -180,24 +196,34 @@ export default function HandsLibraryPage() {
     return a && b ? [a, b] : null;
   }, [selectedForCompare, hands]);
 
-  const handleExportJson = () => {
+  const handleExportJson = async () => {
     const gate = canPerformAction(plan, "exportData");
     if (!gate.allowed) {
       setGateMessage(gate.reason ?? "ייצוא נתונים זמין רק במנוי פרו.");
       return;
     }
     setGateMessage(null);
-    downloadTextFile("hands.json", exportHandsAsJson(filtered), "application/json");
+    setActionError(null);
+    try {
+      downloadTextFile("hands.json", await exportHandsAsJson(filtered), "application/json");
+    } catch {
+      setActionError("שגיאה בייצוא הידיים — נסה שוב.");
+    }
   };
 
-  const handleExportCsv = () => {
+  const handleExportCsv = async () => {
     const gate = canPerformAction(plan, "exportData");
     if (!gate.allowed) {
       setGateMessage(gate.reason ?? "ייצוא נתונים זמין רק במנוי פרו.");
       return;
     }
     setGateMessage(null);
-    downloadTextFile("hands.csv", exportHandsAsCsv(filtered), "text/csv");
+    setActionError(null);
+    try {
+      downloadTextFile("hands.csv", await exportHandsAsCsv(filtered), "text/csv");
+    } catch {
+      setActionError("שגיאה בייצוא הידיים — נסה שוב.");
+    }
   };
 
   return (
@@ -244,6 +270,14 @@ export default function HandsLibraryPage() {
             <a href="/billing" onClick={() => track("upgrade_clicked", { source: "hands_page" })}>
               <Button size="sm">שדרוג לפרו</Button>
             </a>
+          </PanelBody>
+        </Panel>
+      )}
+
+      {actionError && (
+        <Panel className="border-status-risky/40">
+          <PanelBody className="py-3">
+            <span className="text-sm text-status-risky">{actionError}</span>
           </PanelBody>
         </Panel>
       )}
@@ -454,9 +488,14 @@ export default function HandsLibraryPage() {
                       <Button
                         size="sm"
                         variant="danger"
-                        onClick={() => {
-                          deleteHand(h.id);
-                          setHands(listHands());
+                        onClick={async () => {
+                          setActionError(null);
+                          try {
+                            await deleteHand(h.id);
+                            setHands(await listHands());
+                          } catch {
+                            setActionError("שגיאה במחיקת היד — נסה שוב.");
+                          }
                         }}
                       >
                         מחיקה

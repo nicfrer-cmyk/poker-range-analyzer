@@ -54,7 +54,7 @@ export default function SkillTreePage() {
   const [progress, setProgress] = useState<TrainingProgress | null>(null);
 
   useEffect(() => {
-    setHands(listHands());
+    listHands().then(setHands);
     setProgress(loadProgress());
   }, []);
 

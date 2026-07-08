@@ -26,7 +26,13 @@ export default function HandDetailPage() {
   const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
-    setHand(getHand(params.id) ?? null);
+    let cancelled = false;
+    getHand(params.id).then((h) => {
+      if (!cancelled) setHand(h ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [params.id]);
 
   if (hand === undefined) return null;

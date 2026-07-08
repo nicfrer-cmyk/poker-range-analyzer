@@ -15,6 +15,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { claimAllLocalData } from "@/lib/claimLocalData";
+import { migrateLocalHandsAndRangesToSupabase } from "@/lib/migrateLocalHandsRangesToSupabase";
 import { track } from "@/lib/analytics";
 
 /** Today as `YYYY-MM-DD` in the browser's local timezone — good enough for a once-a-day flag,
@@ -53,6 +54,13 @@ export function AuthSync() {
       } catch {
         // localStorage unavailable (e.g. private browsing edge cases) — nothing to do.
       }
+
+      // Hands/ranges moved from localStorage to Supabase — push whatever this browser still
+      // has sitting in the old localStorage keys into the real tables, once per user per
+      // browser (own flag, own idempotency check — see the file for details). Fire-and-forget
+      // from the caller's perspective: it doesn't block the rest of this effect, and pages that
+      // read hands/ranges already re-fetch from Supabase on their own mount.
+      void migrateLocalHandsAndRangesToSupabase(user.id);
 
       // `signup_completed`: fired once, the first time we see a session for this user whose
       // `created_at` and `last_sign_in_at` are within a few seconds of each other — a reliable,

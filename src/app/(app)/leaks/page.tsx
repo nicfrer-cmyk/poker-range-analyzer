@@ -96,7 +96,7 @@ export default function LeaksPage() {
   const [paywallOpen, setPaywallOpen] = useState(false);
 
   useEffect(() => {
-    setHands(listHands());
+    listHands().then(setHands);
   }, []);
 
   const stats = useMemo(() => computeSessionStats(hands), [hands]);

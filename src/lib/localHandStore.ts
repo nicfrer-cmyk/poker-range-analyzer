@@ -6,12 +6,14 @@ import type { AnalysisInput } from "@/lib/store/analysisStore";
 import type { AnalysisResult } from "@/lib/analysisTypes";
 import { estimateEvLoss } from "@/lib/analysisEngine";
 import type { ActionEntry } from "@/lib/engine/handHistoryParser";
+import { createClient } from "@/lib/supabase/client";
 
 /**
- * Local-first hand storage. Persists to localStorage so the app is fully usable before a
- * real Supabase project is connected. Shape mirrors `SavedHandRecord` (the leak finder's
- * input) plus a few extra display-only fields for the Hand Library UI. Swapping this for
- * Supabase later just means replacing these functions' bodies — call sites don't change.
+ * Supabase-backed hand storage (`hands` table, RLS owner-only). Shape mirrors
+ * `SavedHandRecord` (the leak finder's input) plus a few extra display-only fields for the
+ * Hand Library UI. Every function is async now — it round-trips to Postgres via the
+ * browser Supabase client, scoped to the signed-in user. Was localStorage-only before this;
+ * see git history / ROADMAP.md for the previous synchronous implementation.
  */
 export interface StoredHand extends SavedHandRecord {
   id: string;
@@ -25,8 +27,9 @@ export interface StoredHand extends SavedHandRecord {
   sessionId?: string;
   /** Free-text note the user can attach when reviewing the hand later. */
   note?: string;
-  /** Owning user's Supabase auth id, once claimed (see `claimAnonymousHands` below).
-   *  Undefined on records created before Phase 1 (mandatory auth) or not yet claimed. */
+  /** Owning user's Supabase auth id. Always set for rows read back from Supabase — kept
+   *  optional on the type only because some call sites build a `StoredHand`-shaped object
+   *  before it has been persisted. */
   userId?: string;
   /** Full street-by-street action sequence, when known (currently only populated for hands
    *  imported from a parsed hand history — see handHistoryParser.ts's ParsedHand.actions).
@@ -56,45 +59,171 @@ export const MISTAKE_TAG_LABEL: Record<MistakeTag, string> = {
   review: "לבדיקה",
 };
 
-const STORAGE_KEY = "pra:hands:v1";
+// ---------------------------------------------------------------------------
+// DB <-> app-shape mapping. The `hands` table uses snake_case columns and Postgres enums
+// for `street`/`source`; `StoredHand` uses camelCase and lowercase string literals.
+// ---------------------------------------------------------------------------
 
-function readAll(): StoredHand[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as StoredHand[]) : [];
-  } catch {
-    return [];
+const STREET_TO_DB: Record<StoredHand["street"], string> = {
+  preflop: "PREFLOP",
+  flop: "FLOP",
+  turn: "TURN",
+  river: "RIVER",
+};
+const STREET_FROM_DB: Record<string, StoredHand["street"]> = {
+  PREFLOP: "preflop",
+  FLOP: "flop",
+  TURN: "turn",
+  RIVER: "river",
+};
+const SOURCE_TO_DB: Record<StoredHand["source"], string> = {
+  manual: "MANUAL",
+  imported: "IMPORTED",
+};
+const SOURCE_FROM_DB: Record<string, StoredHand["source"]> = {
+  MANUAL: "manual",
+  IMPORTED: "imported",
+};
+
+interface HandRow {
+  id: string;
+  user_id: string;
+  hero_cards: string;
+  board: string | null;
+  villain_range: string;
+  street: string;
+  pot: number;
+  equity_at_decision: number | null;
+  source: string;
+  created_at: string;
+  tags: string[] | null;
+  position: string | null;
+  action_taken: string | null;
+  ev_loss_estimate: number | null;
+  hand_category: string | null;
+  pot_odds_required: number | null;
+  villain_range_raw: string | null;
+  opponent_id: string | null;
+  session_id: string | null;
+  note: string | null;
+  street_actions: unknown;
+  analysis_mode: string | null;
+}
+
+function rowToStoredHand(row: HandRow): StoredHand {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    heroCards: (row.hero_cards ? row.hero_cards.split(" ").filter(Boolean) : []) as StoredHand["heroCards"],
+    board: (row.board ? row.board.split(" ").filter(Boolean) : []) as StoredHand["board"],
+    villainRange: row.villain_range ?? undefined,
+    villainRangeTextRaw: row.villain_range_raw ?? row.villain_range ?? "",
+    position: row.position ?? undefined,
+    potSize: row.pot,
+    street: STREET_FROM_DB[row.street] ?? "preflop",
+    equityAtDecision: row.equity_at_decision ?? 0,
+    potOddsRequired: row.pot_odds_required ?? 0,
+    actionTaken: (row.action_taken ?? "call") as ActionTaken,
+    evLossEstimate: row.ev_loss_estimate ?? 0,
+    timestamp: new Date(row.created_at).getTime(),
+    handCategory: row.hand_category ?? undefined,
+    tags: row.tags ?? [],
+    source: SOURCE_FROM_DB[row.source] ?? "manual",
+    opponentId: row.opponent_id ?? undefined,
+    sessionId: row.session_id ?? undefined,
+    note: row.note ?? undefined,
+    streetActions: (row.street_actions as ActionEntry[] | null) ?? undefined,
+    analysisMode: (row.analysis_mode as StoredHand["analysisMode"] | null) ?? undefined,
+  };
+}
+
+/** Returns the signed-in user, or `null` if nobody is signed in (never throws — callers
+ *  treat "logged out" as "empty result" rather than an error, same as before Supabase). */
+async function getUserId(): Promise<string | null> {
+  const supabase = createClient();
+  const { data } = await supabase.auth.getUser();
+  return data.user?.id ?? null;
+}
+
+export async function listHands(): Promise<StoredHand[]> {
+  const userId = await getUserId();
+  if (!userId) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("hands")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return (data as HandRow[]).map(rowToStoredHand);
+}
+
+export async function getHand(id: string): Promise<StoredHand | undefined> {
+  const userId = await getUserId();
+  if (!userId) return undefined;
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("hands")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error || !data) return undefined;
+  return rowToStoredHand(data as HandRow);
+}
+
+export async function deleteHand(id: string): Promise<void> {
+  const userId = await getUserId();
+  if (!userId) return;
+  const supabase = createClient();
+  const { error } = await supabase.from("hands").delete().eq("id", id).eq("user_id", userId);
+  if (error) throw error;
+}
+
+export async function updateHand(
+  id: string,
+  patch: Partial<StoredHand>
+): Promise<StoredHand | undefined> {
+  const userId = await getUserId();
+  if (!userId) return undefined;
+  const supabase = createClient();
+
+  const dbPatch: Record<string, unknown> = {};
+  if (patch.heroCards !== undefined) dbPatch.hero_cards = patch.heroCards.join(" ");
+  if (patch.board !== undefined) dbPatch.board = patch.board.length ? patch.board.join(" ") : null;
+  if (patch.villainRange !== undefined) dbPatch.villain_range = patch.villainRange;
+  if (patch.villainRangeTextRaw !== undefined) dbPatch.villain_range_raw = patch.villainRangeTextRaw;
+  if (patch.position !== undefined) dbPatch.position = patch.position;
+  if (patch.potSize !== undefined) dbPatch.pot = patch.potSize;
+  if (patch.street !== undefined) dbPatch.street = STREET_TO_DB[patch.street];
+  if (patch.equityAtDecision !== undefined) dbPatch.equity_at_decision = patch.equityAtDecision;
+  if (patch.potOddsRequired !== undefined) dbPatch.pot_odds_required = patch.potOddsRequired;
+  if (patch.actionTaken !== undefined) dbPatch.action_taken = patch.actionTaken;
+  if (patch.evLossEstimate !== undefined) dbPatch.ev_loss_estimate = patch.evLossEstimate;
+  if (patch.handCategory !== undefined) dbPatch.hand_category = patch.handCategory;
+  if (patch.tags !== undefined) dbPatch.tags = patch.tags;
+  if (patch.source !== undefined) dbPatch.source = SOURCE_TO_DB[patch.source];
+  if (patch.opponentId !== undefined) dbPatch.opponent_id = patch.opponentId;
+  if (patch.sessionId !== undefined) dbPatch.session_id = patch.sessionId;
+  if (patch.note !== undefined) dbPatch.note = patch.note;
+  if (patch.streetActions !== undefined) dbPatch.street_actions = patch.streetActions;
+  if (patch.analysisMode !== undefined) dbPatch.analysis_mode = patch.analysisMode;
+  if (patch.timestamp !== undefined) {
+    dbPatch.created_at = new Date(Number(patch.timestamp)).toISOString();
   }
+
+  const { data, error } = await supabase
+    .from("hands")
+    .update(dbPatch)
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
+  if (error || !data) return undefined;
+  return rowToStoredHand(data as HandRow);
 }
 
-function writeAll(hands: StoredHand[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(hands));
-}
-
-export function listHands(): StoredHand[] {
-  return readAll().sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
-}
-
-export function getHand(id: string): StoredHand | undefined {
-  return readAll().find((h) => h.id === id);
-}
-
-export function deleteHand(id: string) {
-  writeAll(readAll().filter((h) => h.id !== id));
-}
-
-export function updateHand(id: string, patch: Partial<StoredHand>): StoredHand | undefined {
-  const hands = readAll();
-  const idx = hands.findIndex((h) => h.id === id);
-  if (idx === -1) return undefined;
-  hands[idx] = { ...hands[idx]!, ...patch, id: hands[idx]!.id };
-  writeAll(hands);
-  return hands[idx];
-}
-
-export function saveHand({
+export async function saveHand({
   input,
   result,
   action = "call",
@@ -114,61 +243,63 @@ export function saveHand({
   sessionId?: string;
   streetActions?: ActionEntry[];
   analysisMode?: "quick" | "advanced";
-}): StoredHand {
-  const hands = readAll();
-  const record: StoredHand = {
-    id: `hand_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    heroCards: input.heroCards.filter(Boolean) as StoredHand["heroCards"],
-    board: input.board.filter(Boolean) as StoredHand["board"],
-    villainRange: input.villainRangeText,
-    villainRangeTextRaw: input.villainRangeText,
-    position,
-    potSize: input.pot,
-    street: result.street,
-    equityAtDecision: result.heroEquityPct / 100,
-    potOddsRequired: result.potOdds.requiredEquityPct / 100,
-    actionTaken: action,
-    evLossEstimate: estimateEvLoss(result, action),
-    timestamp: Date.now(),
-    handCategory: result.heroCategory,
-    tags,
-    source,
-    sessionId,
-    streetActions,
-    analysisMode,
-  };
-  hands.push(record);
-  writeAll(hands);
-  return record;
-}
-
-export function clearAllHands() {
-  writeAll([]);
-}
-
-/**
- * Tags every hand that doesn't yet have an owner with `userId`. Idempotent — safe to call on
- * every login, not just the first: already-claimed records (whether owned by this user or a
- * different one on a shared browser) are left untouched. Data stays in `localStorage`; syncing
- * it to Supabase is an explicitly later phase.
- */
-export function claimAnonymousHands(userId: string): void {
-  const hands = readAll();
-  let changed = false;
-  for (const hand of hands) {
-    if (hand.userId === undefined) {
-      hand.userId = userId;
-      changed = true;
-    }
+}): Promise<StoredHand> {
+  const supabase = createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) {
+    throw new Error("יש להתחבר כדי לשמור יד.");
   }
-  if (changed) writeAll(hands);
+
+  const heroCards = input.heroCards.filter(Boolean) as StoredHand["heroCards"];
+  const board = input.board.filter(Boolean) as StoredHand["board"];
+  const timestamp = Date.now();
+
+  const insertRow = {
+    id: crypto.randomUUID(),
+    user_id: user.id,
+    hero_cards: heroCards.join(" "),
+    board: board.length ? board.join(" ") : null,
+    villain_range: input.villainRangeText,
+    villain_range_raw: input.villainRangeText,
+    position: position ?? null,
+    pot: input.pot,
+    street: STREET_TO_DB[result.street],
+    equity_at_decision: result.heroEquityPct / 100,
+    pot_odds_required: result.potOdds.requiredEquityPct / 100,
+    action_taken: action,
+    ev_loss_estimate: estimateEvLoss(result, action),
+    created_at: new Date(timestamp).toISOString(),
+    hand_category: result.heroCategory,
+    tags,
+    source: SOURCE_TO_DB[source],
+    session_id: sessionId ?? null,
+    street_actions: streetActions ?? null,
+    analysis_mode: analysisMode ?? null,
+  };
+
+  const { data, error } = await supabase.from("hands").insert(insertRow).select("*").single();
+  if (error || !data) {
+    throw new Error(error?.message ?? "שגיאה בשמירת היד.");
+  }
+  return rowToStoredHand(data as HandRow);
 }
 
-export function exportHandsAsJson(hands: StoredHand[] = listHands()): string {
-  return JSON.stringify(hands, null, 2);
+export async function clearAllHands(): Promise<void> {
+  const userId = await getUserId();
+  if (!userId) return;
+  const supabase = createClient();
+  const { error } = await supabase.from("hands").delete().eq("user_id", userId);
+  if (error) throw error;
 }
 
-export function exportHandsAsCsv(hands: StoredHand[] = listHands()): string {
+export async function exportHandsAsJson(hands?: StoredHand[]): Promise<string> {
+  const list = hands ?? (await listHands());
+  return JSON.stringify(list, null, 2);
+}
+
+export async function exportHandsAsCsv(hands?: StoredHand[]): Promise<string> {
+  const list = hands ?? (await listHands());
   const header = [
     "תאריך",
     "קלפי הירו",
@@ -179,7 +310,7 @@ export function exportHandsAsCsv(hands: StoredHand[] = listHands()): string {
     "פעולה",
     "תגית",
   ];
-  const rows = hands.map((h) => [
+  const rows = list.map((h) => [
     new Date(Number(h.timestamp)).toLocaleDateString("he-IL"),
     h.heroCards.join(" "),
     h.board.join(" "),

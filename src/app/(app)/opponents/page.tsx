@@ -28,10 +28,11 @@ export default function OpponentsPage() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [plan] = useMockPlan();
   const [gateMessage, setGateMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const refresh = () => {
+  const refresh = async () => {
     setOpponents(listOpponents());
-    setHands(listHands());
+    setHands(await listHands());
   };
 
   useEffect(() => {
@@ -59,34 +60,41 @@ export default function OpponentsPage() {
     setEditingOpponent(null);
   };
 
-  const handleSubmit = (values: OpponentFormValues) => {
+  const handleSubmit = async (values: OpponentFormValues) => {
     if (editingOpponent) {
       updateOpponent(editingOpponent.id, values);
     } else {
       saveOpponent(values);
     }
     closeModal();
-    refresh();
+    await refresh();
   };
 
-  const handleDelete = (opponent: StoredOpponent) => {
+  const handleDelete = async (opponent: StoredOpponent) => {
     const confirmed = window.confirm(
       `למחוק את הפרופיל של "${opponent.name}"? הפעולה אינה הפיכה, אך ידיים שקושרו אליו יישארו בספרייה ללא שיוך.`
     );
     if (!confirmed) return;
 
-    // Free up hands linked to this opponent so they show up again as unlinked.
-    hands
-      .filter((h) => h.opponentId === opponent.id)
-      .forEach((h) => updateHand(h.id, { opponentId: undefined }));
+    setError(null);
+    try {
+      // Free up hands linked to this opponent so they show up again as unlinked.
+      await Promise.all(
+        hands
+          .filter((h) => h.opponentId === opponent.id)
+          .map((h) => updateHand(h.id, { opponentId: undefined }))
+      );
 
-    deleteOpponent(opponent.id);
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(opponent.id);
-      return next;
-    });
-    refresh();
+      deleteOpponent(opponent.id);
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(opponent.id);
+        return next;
+      });
+      await refresh();
+    } catch {
+      setError("שגיאה במחיקת פרופיל היריב — נסה שוב.");
+    }
   };
 
   const toggleExpand = (id: string) => {
@@ -98,14 +106,24 @@ export default function OpponentsPage() {
     });
   };
 
-  const linkHand = (handId: string, opponentId: string) => {
-    updateHand(handId, { opponentId });
-    refresh();
+  const linkHand = async (handId: string, opponentId: string) => {
+    setError(null);
+    try {
+      await updateHand(handId, { opponentId });
+      await refresh();
+    } catch {
+      setError("שגיאה בקישור היד — נסה שוב.");
+    }
   };
 
-  const unlinkHand = (handId: string) => {
-    updateHand(handId, { opponentId: undefined });
-    refresh();
+  const unlinkHand = async (handId: string) => {
+    setError(null);
+    try {
+      await updateHand(handId, { opponentId: undefined });
+      await refresh();
+    } catch {
+      setError("שגיאה בביטול קישור היד — נסה שוב.");
+    }
   };
 
   return (
@@ -127,6 +145,14 @@ export default function OpponentsPage() {
             <a href="/billing" onClick={() => track("upgrade_clicked", { source: "opponents_page" })}>
               <Button size="sm">שדרוג לפרו</Button>
             </a>
+          </PanelBody>
+        </Panel>
+      )}
+
+      {error && (
+        <Panel className="border-status-risky/40">
+          <PanelBody className="py-3">
+            <span className="text-sm text-status-risky">{error}</span>
           </PanelBody>
         </Panel>
       )}

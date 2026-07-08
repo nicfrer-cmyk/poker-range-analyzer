@@ -40,10 +40,11 @@ export default function NotificationsPage() {
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [plan] = useMockPlan();
 
-  const refresh = () => {
+  const refresh = async () => {
     const settings = getNotificationSettings();
+    const hands = await listHands();
     const items = visibleNotifications(
-      computeNotifications(listHands(), {
+      computeNotifications(hands, {
         plan,
         todayAnalysisCount: getTodayCount("analysis"),
         ...settings,

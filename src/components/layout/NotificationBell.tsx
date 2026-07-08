@@ -36,16 +36,23 @@ export function NotificationBell() {
 
   // Recompute fresh from local data on mount — no push notifications, no stored event log.
   useEffect(() => {
-    const settings = getNotificationSettings();
-    const items = visibleNotifications(
-      computeNotifications(listHands(), {
-        plan,
-        todayAnalysisCount: getTodayCount("analysis"),
-        ...settings,
-      })
-    );
-    setNotifications(items);
-    setUnreadCount(unreadNotifications(items).length);
+    let cancelled = false;
+    listHands().then((hands) => {
+      if (cancelled) return;
+      const settings = getNotificationSettings();
+      const items = visibleNotifications(
+        computeNotifications(hands, {
+          plan,
+          todayAnalysisCount: getTodayCount("analysis"),
+          ...settings,
+        })
+      );
+      setNotifications(items);
+      setUnreadCount(unreadNotifications(items).length);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [plan]);
 
   const handleToggle = () => {

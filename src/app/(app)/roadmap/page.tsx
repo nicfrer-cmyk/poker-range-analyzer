@@ -16,7 +16,7 @@ export default function RoadmapPage() {
   const [roadmap, setRoadmap] = useState<RoadmapState | null>(null);
 
   useEffect(() => {
-    setHands(listHands());
+    listHands().then(setHands);
     setProgress(loadProgress());
   }, []);
 

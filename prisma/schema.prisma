@@ -74,18 +74,36 @@ model User {
 }
 
 model Hand {
-  id                String     @id @default(cuid())
-  userId            String     @map("user_id")
-  heroCards         String     @map("hero_cards")
-  board             String?
-  villainRange      String     @map("villain_range")
-  street            Street
-  pot               Float
-  result            String?
-  tags              String[]   @default([])
-  equityAtDecision  Float?     @map("equity_at_decision")
-  source            HandSource @default(MANUAL)
-  createdAt         DateTime   @default(now()) @map("created_at")
+  id                  String     @id @default(cuid())
+  userId              String     @map("user_id")
+  heroCards           String     @map("hero_cards")
+  board               String?
+  villainRange        String     @map("villain_range")
+  street              Street
+  pot                 Float
+  result              String?
+  tags                String[]   @default([])
+  equityAtDecision    Float?     @map("equity_at_decision")
+  source              HandSource @default(MANUAL)
+  createdAt           DateTime   @default(now()) @map("created_at")
+
+  // Added for the localStorage -> Supabase data-layer swap: these mirror fields that
+  // `StoredHand` (src/lib/localHandStore.ts) already used when hands were localStorage-only.
+  position            String?
+  actionTaken         String?    @map("action_taken")
+  evLossEstimate      Float?     @map("ev_loss_estimate")
+  handCategory        String?    @map("hand_category")
+  potOddsRequired     Float?     @map("pot_odds_required")
+  villainRangeTextRaw String?    @map("villain_range_raw")
+  // Not a real FK — src/lib/localOpponentStore.ts / localSessionStore.ts aren't migrated to
+  // Supabase in this task, so these are plain nullable id columns with no constraint.
+  opponentId          String?    @map("opponent_id")
+  sessionId           String?    @map("session_id")
+  note                String?
+  // Street-by-street action sequence, when known. Same `Json?` pattern as
+  // Session.statsJson / Opponent.tendencies below — no fixed shape enforced at the DB level.
+  streetActions       Json?      @map("street_actions")
+  analysisMode        String?    @map("analysis_mode")
 
   user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -26,7 +26,7 @@ export default function WeeklyReviewPage() {
   const [paywallOpen, setPaywallOpen] = useState(false);
 
   useEffect(() => {
-    setHands(listHands());
+    listHands().then(setHands);
     setProgress(loadProgress());
   }, []);
 

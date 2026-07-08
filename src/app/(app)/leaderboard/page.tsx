@@ -64,7 +64,7 @@ export default function LeaderboardPage() {
   const [hands, setHands] = useState<StoredHand[]>([]);
 
   useEffect(() => {
-    setHands(listHands());
+    listHands().then(setHands);
   }, []);
 
   const today = useMemo(() => todayStats(hands), [hands]);

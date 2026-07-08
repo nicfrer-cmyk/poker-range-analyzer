@@ -1,75 +1,121 @@
 "use client";
 
+import { createClient } from "@/lib/supabase/client";
+
+/**
+ * Supabase-backed range storage (`ranges` table, RLS owner-only — see the RLS migration for
+ * the `is_preset` carve-out, which this file doesn't touch; every function here is scoped to
+ * the signed-in user's own saved ranges). Every function is async now — it round-trips to
+ * Postgres via the browser Supabase client. Was localStorage-only before this; see git
+ * history / ROADMAP.md for the previous synchronous implementation.
+ */
 export interface StoredRange {
   id: string;
   name: string;
   combos: string; // range notation
   createdAt: number;
-  /** Owning user's Supabase auth id, once claimed (see `claimAnonymousRanges` below).
-   *  Undefined on records created before Phase 1 (mandatory auth) or not yet claimed. */
+  /** Owning user's Supabase auth id. Always set for rows read back from Supabase — kept
+   *  optional on the type only for parity with pre-migration records. */
   userId?: string;
 }
 
-const STORAGE_KEY = "pra:ranges:v1";
+interface RangeRow {
+  id: string;
+  user_id: string | null;
+  name: string;
+  combos: string;
+  created_at: string;
+}
 
-function readAll(): StoredRange[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as StoredRange[]) : [];
-  } catch {
-    return [];
+function rowToStoredRange(row: RangeRow): StoredRange {
+  return {
+    id: row.id,
+    name: row.name,
+    combos: row.combos,
+    createdAt: new Date(row.created_at).getTime(),
+    userId: row.user_id ?? undefined,
+  };
+}
+
+/** Returns the signed-in user, or `null` if nobody is signed in (never throws — callers
+ *  treat "logged out" as "empty result" rather than an error). */
+async function getUserId(): Promise<string | null> {
+  const supabase = createClient();
+  const { data } = await supabase.auth.getUser();
+  return data.user?.id ?? null;
+}
+
+export async function listRanges(): Promise<StoredRange[]> {
+  const userId = await getUserId();
+  if (!userId) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("ranges")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return (data as RangeRow[]).map(rowToStoredRange);
+}
+
+export async function saveRange(name: string, combos: string): Promise<StoredRange> {
+  const supabase = createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) {
+    throw new Error("יש להתחבר כדי לשמור טווח.");
   }
-}
 
-function writeAll(ranges: StoredRange[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(ranges));
-}
-
-export function listRanges(): StoredRange[] {
-  return readAll().sort((a, b) => b.createdAt - a.createdAt);
-}
-
-export function saveRange(name: string, combos: string): StoredRange {
-  const ranges = readAll();
-  const range: StoredRange = {
-    id: `range_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+  const insertRow = {
+    id: crypto.randomUUID(),
+    user_id: user.id,
     name,
     combos,
-    createdAt: Date.now(),
+    created_at: new Date().toISOString(),
   };
-  ranges.push(range);
-  writeAll(ranges);
-  return range;
-}
 
-export function deleteRange(id: string) {
-  writeAll(readAll().filter((r) => r.id !== id));
-}
-
-export function updateRange(id: string, patch: Partial<Pick<StoredRange, "name" | "combos">>) {
-  const ranges = readAll();
-  const idx = ranges.findIndex((r) => r.id === id);
-  if (idx === -1) return;
-  ranges[idx] = { ...ranges[idx]!, ...patch };
-  writeAll(ranges);
-}
-
-export function clearAllRanges() {
-  writeAll([]);
-}
-
-/** Tags every range that doesn't yet have an owner with `userId`. Idempotent — safe to call
- *  on every login. Data stays in `localStorage`; Supabase sync is a later phase. */
-export function claimAnonymousRanges(userId: string): void {
-  const ranges = readAll();
-  let changed = false;
-  for (const range of ranges) {
-    if (range.userId === undefined) {
-      range.userId = userId;
-      changed = true;
-    }
+  const { data, error } = await supabase.from("ranges").insert(insertRow).select("*").single();
+  if (error || !data) {
+    throw new Error(error?.message ?? "שגיאה בשמירת הטווח.");
   }
-  if (changed) writeAll(ranges);
+  return rowToStoredRange(data as RangeRow);
+}
+
+export async function deleteRange(id: string): Promise<void> {
+  const userId = await getUserId();
+  if (!userId) return;
+  const supabase = createClient();
+  const { error } = await supabase.from("ranges").delete().eq("id", id).eq("user_id", userId);
+  if (error) throw error;
+}
+
+export async function updateRange(
+  id: string,
+  patch: Partial<Pick<StoredRange, "name" | "combos">>
+): Promise<StoredRange | undefined> {
+  const userId = await getUserId();
+  if (!userId) return undefined;
+  const supabase = createClient();
+
+  const dbPatch: Record<string, unknown> = {};
+  if (patch.name !== undefined) dbPatch.name = patch.name;
+  if (patch.combos !== undefined) dbPatch.combos = patch.combos;
+
+  const { data, error } = await supabase
+    .from("ranges")
+    .update(dbPatch)
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
+  if (error || !data) return undefined;
+  return rowToStoredRange(data as RangeRow);
+}
+
+export async function clearAllRanges(): Promise<void> {
+  const userId = await getUserId();
+  if (!userId) return;
+  const supabase = createClient();
+  const { error } = await supabase.from("ranges").delete().eq("user_id", userId);
+  if (error) throw error;
 }
