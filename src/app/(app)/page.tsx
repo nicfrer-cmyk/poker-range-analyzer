@@ -36,9 +36,10 @@ function greeting(): string {
   return "ערב טוב";
 }
 
-/** Still-stubbed tools ("coming soon" pages) surfaced from the dashboard's secondary quick-actions
- *  row — kept separate from the working tools so the dashboard never implies they're fully built. */
-const STUB_TOOLS = [
+/** Secondary tools surfaced from the dashboard's "כלים נוספים" row — all fully built, also
+ *  reachable from the sidebar/bottom-nav (src/lib/nav.ts), just called out here too since
+ *  they're easy to miss among the coach-focused surfaces above. */
+const MORE_TOOLS = [
   { href: "/range-vs-range", label: "טווח מול טווח" },
   { href: "/icm", label: "מחשבון ICM" },
   { href: "/bankroll", label: "מעקב בנקרול" },
@@ -386,22 +387,13 @@ export default function DashboardPage() {
                     ניתוח יד עם AI (כולל העלאת תמונה)
                   </Button>
                 </Link>
-              </div>
-
-              <div className="border-t border-base-border pt-3">
-                <p className="mb-2 text-xs text-base-muted">בקרוב</p>
-                <div className="flex flex-wrap gap-2">
-                  {STUB_TOOLS.map((tool) => (
-                    <Link key={tool.href} href={tool.href} className="opacity-70 transition-opacity hover:opacity-100">
-                      <Button variant="ghost" size="sm" className="gap-1.5">
-                        {tool.label}
-                        <Badge tone="neutral" className="px-1.5 py-0 text-[10px]">
-                          בקרוב
-                        </Badge>
-                      </Button>
-                    </Link>
-                  ))}
-                </div>
+                {MORE_TOOLS.map((tool) => (
+                  <Link key={tool.href} href={tool.href}>
+                    <Button variant="secondary" size="sm">
+                      {tool.label}
+                    </Button>
+                  </Link>
+                ))}
               </div>
             </PanelBody>
           </Panel>

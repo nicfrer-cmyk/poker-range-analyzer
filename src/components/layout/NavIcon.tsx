@@ -66,6 +66,22 @@ const paths: Record<NavItem["icon"], React.ReactNode> = {
       <path d="M3 16l9 5 9-5" />
     </>
   ),
+  calculator: (
+    <>
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M8 7h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h.01" />
+    </>
+  ),
+  compare: <path d="M7 8 3 12l4 4M17 8l4 4-4 4M10 12h4" />,
+  wallet: (
+    <>
+      <path d="M3 7a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+      <path d="M16.5 12H19a1.5 1.5 0 0 1 0 3h-2.5a1.5 1.5 0 0 1 0-3Z" />
+    </>
+  ),
+  sparkle: (
+    <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" />
+  ),
 };
 
 export function NavIcon({ icon, className }: { icon: NavItem["icon"]; className?: string }) {
