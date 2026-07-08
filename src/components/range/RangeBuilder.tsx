@@ -72,9 +72,14 @@ function tooltipForLabel(label: string): string {
 export function RangeBuilder({
   value,
   onChange,
+  title = "הטווח של היריב",
 }: {
   value: string;
   onChange: (text: string) => void;
+  /** Panel title — defaults to the original "villain range" wording so existing callers are
+   *  unaffected. Pass a different title to reuse this same builder for a second range input
+   *  (e.g. the hero's own range on the Range vs Range page). */
+  title?: string;
 }) {
   const [manualLabels, setManualLabels] = useState<Set<string> | null>(null);
 
@@ -96,7 +101,7 @@ export function RangeBuilder({
   return (
     <Panel>
       <PanelHeader>
-        <PanelTitle>הטווח של היריב</PanelTitle>
+        <PanelTitle>{title}</PanelTitle>
       </PanelHeader>
       <PanelBody className="space-y-3">
         <div className="flex flex-wrap gap-1.5">
