@@ -33,8 +33,8 @@ import { PLAN_LIMITS, type Plan } from "@/lib/plan";
 import { PRO_PRICING_ILS, type BillingInterval } from "@/lib/grow/plans";
 import { track } from "@/lib/analytics";
 
-function getOrigin(): string {
-  const headerList = headers();
+async function getOrigin(): Promise<string> {
+  const headerList = await headers();
   const host = headerList.get("x-forwarded-host") ?? headerList.get("host");
   const protocol = headerList.get("x-forwarded-proto") ?? "http";
   return host ? `${protocol}://${host}` : "http://localhost:3000";
@@ -49,7 +49,7 @@ async function upgradeToPro(interval: BillingInterval) {
   // stand-in for an onClick.
   track("upgrade_clicked", { source: "billing_page", interval });
 
-  const cookieHeader = cookies()
+  const cookieHeader = (await cookies())
     .getAll()
     .map((c) => `${c.name}=${c.value}`)
     .join("; ");
@@ -61,7 +61,7 @@ async function upgradeToPro(interval: BillingInterval) {
   let errorMessage: string | undefined;
 
   try {
-    const res = await fetch(`${getOrigin()}/api/grow/checkout`, {
+    const res = await fetch(`${await getOrigin()}/api/grow/checkout`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -105,7 +105,7 @@ async function getCurrentUserAndSubscription(): Promise<{
   configError: string | null;
 }> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -126,11 +126,12 @@ async function getCurrentUserAndSubscription(): Promise<{
   }
 }
 
-export default async function BillingPage({
-  searchParams,
-}: {
-  searchParams: { checkout?: string; message?: string };
-}) {
+export default async function BillingPage(
+  props: {
+    searchParams: Promise<{ checkout?: string; message?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const { email, subscription, configError } = await getCurrentUserAndSubscription();
 
   const checkoutError =

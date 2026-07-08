@@ -13,11 +13,12 @@ function safeNextPath(next: string | undefined): string {
   return next;
 }
 
-export default function LoginPage({
-  searchParams,
-}: {
-  searchParams: { error?: string; next?: string; message?: string };
-}) {
+export default async function LoginPage(
+  props: {
+    searchParams: Promise<{ error?: string; next?: string; message?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   async function action(formData: FormData) {
     "use server";
     const email = String(formData.get("email") ?? "");

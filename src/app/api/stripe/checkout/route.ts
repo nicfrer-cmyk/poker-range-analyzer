@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   let userId: string;
   let userEmail: string | undefined;
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
       data: { user },
       error,

@@ -5,11 +5,12 @@ import { Panel, PanelBody } from "@/components/ui/Panel";
 import { PasswordField } from "@/components/auth/PasswordField";
 import { track } from "@/lib/analytics";
 
-export default function SignupPage({
-  searchParams,
-}: {
-  searchParams: { error?: string };
-}) {
+export default async function SignupPage(
+  props: {
+    searchParams: Promise<{ error?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   async function action(formData: FormData) {
     "use server";
     // Fires once per real submit attempt (this only runs on an actual form POST, never on

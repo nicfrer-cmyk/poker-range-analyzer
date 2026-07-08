@@ -10,7 +10,7 @@
 // rather than silently returning a broken client. See `.env.example`.
 // ---------------------------------------------------------------------------
 
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 function getSupabaseEnv() {
@@ -32,37 +32,33 @@ function getSupabaseEnv() {
 /**
  * Creates a Supabase client for use on the server, backed by the Next.js
  * `cookies()` store. Safe to call in Server Components, Server Actions, and
- * Route Handlers.
+ * Route Handlers. `cookies()` is async as of Next 15+, so this is now async
+ * too — every call site must `await createClient()`.
  *
  * Note: Server Components cannot write cookies (Next.js will throw if you
  * try). Supabase may attempt to refresh the auth token during a read in a
- * Server Component; the `set`/`remove` calls below are wrapped in try/catch
- * so that refresh attempt fails silently there. Session refresh is expected
- * to actually persist via `src/lib/supabase/middleware.ts` instead, which
- * runs on every request and can write cookies.
+ * Server Component; the `setAll` call below is wrapped in try/catch so that
+ * refresh attempt fails silently there. Session refresh is expected to
+ * actually persist via `src/lib/supabase/middleware.ts` instead, which runs
+ * on every request and can write cookies.
  */
-export function createClient() {
+export async function createClient() {
   const { url, anonKey } = getSupabaseEnv();
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   return createServerClient(url, anonKey, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      getAll() {
+        return cookieStore.getAll();
       },
-      set(name: string, value: string, options: CookieOptions) {
+      setAll(cookiesToSet) {
         try {
-          cookieStore.set({ name, value, ...options });
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
         } catch {
           // Called from a Server Component — the middleware handles
           // refreshing the user's session instead. Safe to ignore.
-        }
-      },
-      remove(name: string, options: CookieOptions) {
-        try {
-          cookieStore.set({ name, value: "", ...options });
-        } catch {
-          // Called from a Server Component — see note above.
         }
       },
     },
