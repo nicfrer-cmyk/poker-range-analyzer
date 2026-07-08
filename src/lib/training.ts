@@ -26,7 +26,10 @@ export type TrackId =
   | "range-reading"
   | "pot-odds"
   | "board-texture"
-  | "common-leaks";
+  | "common-leaks"
+  | "threebet-pots"
+  | "postflop-cbet"
+  | "river-bluffcatch";
 
 export interface TrackInfo {
   id: TrackId;
@@ -71,6 +74,27 @@ export const TRACKS: TrackInfo[] = [
     shortLabel: "טעויות נפוצות",
     description: "תרחישים שמדמים דפוסי טעות שכיחים, כמו הגנת יתר או רדיפה אחרי דרואו חלש.",
     icon: "⚠️",
+  },
+  {
+    id: "threebet-pots",
+    label: "פוטים של 3-בט/4-בט",
+    shortLabel: "3-בט פוטים",
+    description: "החלטות מול טווח 3-בט או 4-בט הדוק ופולריזד — פוטים גדולים יותר, שוליים דקים יותר.",
+    icon: "🔥",
+  },
+  {
+    id: "postflop-cbet",
+    label: "סי-בט פוסט-פלופ",
+    shortLabel: "סי-בט",
+    description: "אתה התוקף הפרה-פלופי על הפלופ — להמר להמשך ערך/פחד, או לבדוק ולוותר על הרחוב.",
+    icon: "💣",
+  },
+  {
+    id: "river-bluffcatch",
+    label: "תפיסת בלאף בריבר",
+    shortLabel: "בלאף-קאטצ'",
+    description: "הבורד המלא כבר בחוץ ואתה מול הימור בריבר — לתפוס בלאף או לשחרר יד בינונית.",
+    icon: "🎭",
   },
 ];
 
@@ -319,7 +343,7 @@ function deriveCorrectAction(
 function tryBuildScenario(trackId: TrackId, rng: () => number): TrainingScenario | null {
   const presetKeys = Object.keys(PRESET_RANGES) as PresetRangeKey[];
 
-  let boardLen: 0 | 3 | 4;
+  let boardLen: 0 | 3 | 4 | 5;
   let villainKey: PresetRangeKey;
   let facingMode: FacingBetMode;
   let leakFlavor: string | undefined;
@@ -353,6 +377,21 @@ function tryBuildScenario(trackId: TrackId, rng: () => number): TrainingScenario
       leakFlavor = pattern.flavor;
       break;
     }
+    case "threebet-pots":
+      boardLen = 0;
+      villainKey = pick(["3BET", "4BET"] as PresetRangeKey[], rng);
+      facingMode = "facing-bet";
+      break;
+    case "postflop-cbet":
+      boardLen = 3;
+      villainKey = pick(presetKeys, rng);
+      facingMode = "no-bet";
+      break;
+    case "river-bluffcatch":
+      boardLen = 5;
+      villainKey = pick(presetKeys, rng);
+      facingMode = "facing-bet";
+      break;
     default:
       boardLen = 0;
       villainKey = pick(presetKeys, rng);
@@ -526,9 +565,18 @@ function buildExplanation(s: TrainingScenario): string {
       ? ` מרקם הבורד כאן (${s.boardTexture.label}) משפיע ישירות על כמה אפשר לסמוך על היד — בורדים כאלה משנים את התדירות שכדאי להמשיך בה.`
       : "";
 
+  const trackFlavorSentence =
+    s.trackId === "threebet-pots"
+      ? " בפוט של 3-בט/4-בט הטווח של היריב הדוק ופולריזד בהרבה מפתיחה רגילה, אז אותה יד יכולה להיות טעות אחרת לגמרי מול הטווח הזה."
+      : s.trackId === "postflop-cbet"
+        ? " בתור התוקף הפרה-פלופי, ההחלטה כאן היא אם להמשיך ללחוץ עם סי-בט או לוותר על היוזמה ולבדוק — לא כל יד שפתחת שווה המשך הימור."
+        : s.trackId === "river-bluffcatch"
+          ? " בריבר כל המידע כבר בחוץ — אין עוד קלפים שיכולים לשפר אותך, אז ההחלטה מתבססת רק על כמה סביר שהיריב מבלף בטווח ההימור הזה."
+          : "";
+
   const leakSentence = s.leakFlavor ? ` ${s.leakFlavor}` : "";
 
-  return `${openSentence} ${handSentence} ${reasonSentence}${textureSentence}${leakSentence}`;
+  return `${openSentence} ${handSentence} ${reasonSentence}${textureSentence}${trackFlavorSentence}${leakSentence}`;
 }
 
 export function evaluateAnswer(
@@ -667,7 +715,43 @@ export const BADGES: BadgeDefinition[] = [
     description: "80% דיוק לפחות אחרי 20 תרגולים ומעלה",
     check: (p) => p.totalAnswered >= 20 && p.totalCorrect / p.totalAnswered >= 0.8,
   },
+  {
+    id: "all-tracks-tried",
+    label: "סייר הנושאים",
+    description: "לפחות תרגול אחד בכל אחד מהנושאים",
+    check: (p) => TRACKS.every((t) => (p.perTrack[t.id]?.answered ?? 0) > 0),
+  },
+  {
+    id: "master-threebet-pots",
+    label: "מאסטר 3-בט פוטים",
+    description: "80% דיוק לפחות ב'פוטים של 3-בט/4-בט' אחרי 15 תרגולים ומעלה",
+    check: (p) => trackMastered(p, "threebet-pots"),
+  },
+  {
+    id: "master-postflop-cbet",
+    label: "מאסטר סי-בט",
+    description: "80% דיוק לפחות ב'סי-בט פוסט-פלופ' אחרי 15 תרגולים ומעלה",
+    check: (p) => trackMastered(p, "postflop-cbet"),
+  },
+  {
+    id: "master-river-bluffcatch",
+    label: "מאסטר תפיסת בלאף",
+    description: "80% דיוק לפחות ב'תפיסת בלאף בריבר' אחרי 15 תרגולים ומעלה",
+    check: (p) => trackMastered(p, "river-bluffcatch"),
+  },
 ];
+
+const TRACK_MASTERY_MIN_ANSWERED = 15;
+const TRACK_MASTERY_MIN_ACCURACY = 0.8;
+
+function trackMastered(p: TrainingProgress, trackId: TrackId): boolean {
+  const stats = p.perTrack[trackId];
+  return (
+    !!stats &&
+    stats.answered >= TRACK_MASTERY_MIN_ANSWERED &&
+    stats.correct / stats.answered >= TRACK_MASTERY_MIN_ACCURACY
+  );
+}
 
 function computeEarnedBadges(p: TrainingProgress): string[] {
   return BADGES.filter((b) => b.check(p)).map((b) => b.id);

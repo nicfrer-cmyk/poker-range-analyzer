@@ -38,7 +38,9 @@ export function TrainingQuestion({
             ? "פרה-פלופ"
             : scenario.board.length === 3
               ? "פלופ"
-              : "טרן"}
+              : scenario.board.length === 4
+                ? "טרן"
+                : "ריבר"}
         </Badge>
       </PanelHeader>
       <PanelBody className="space-y-5">
