@@ -31,16 +31,17 @@ export default function OpponentsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = async () => {
-    setOpponents(listOpponents());
-    setHands(await listHands());
+    const [opponentsList, handsList] = await Promise.all([listOpponents(), listHands()]);
+    setOpponents(opponentsList);
+    setHands(handsList);
   };
 
   useEffect(() => {
     refresh();
   }, []);
 
-  const openCreateModal = () => {
-    const gate = canPerformAction(plan, "addOpponentProfile", listOpponents().length);
+  const openCreateModal = async () => {
+    const gate = canPerformAction(plan, "addOpponentProfile", (await listOpponents()).length);
     if (!gate.allowed) {
       setGateMessage(gate.reason ?? "הגעת למגבלת פרופילי היריבים בתוכנית החינמית.");
       return;
@@ -62,9 +63,9 @@ export default function OpponentsPage() {
 
   const handleSubmit = async (values: OpponentFormValues) => {
     if (editingOpponent) {
-      updateOpponent(editingOpponent.id, values);
+      await updateOpponent(editingOpponent.id, values);
     } else {
-      saveOpponent(values);
+      await saveOpponent(values);
     }
     closeModal();
     await refresh();
@@ -85,7 +86,7 @@ export default function OpponentsPage() {
           .map((h) => updateHand(h.id, { opponentId: undefined }))
       );
 
-      deleteOpponent(opponent.id);
+      await deleteOpponent(opponent.id);
       setExpandedIds((prev) => {
         const next = new Set(prev);
         next.delete(opponent.id);

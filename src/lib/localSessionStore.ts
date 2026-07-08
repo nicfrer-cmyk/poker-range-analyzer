@@ -1,67 +1,96 @@
 "use client";
 
+import { createClient } from "@/lib/supabase/client";
+
+/**
+ * Supabase-backed session storage (`sessions` table, RLS owner-only). Every function is async
+ * now — it round-trips to Postgres via the browser Supabase client, scoped to the signed-in
+ * user. Was localStorage-only before this; see git history / ROADMAP.md for the previous
+ * synchronous implementation.
+ */
 export interface StoredSession {
   id: string;
   name: string;
   handIds: string[];
   createdAt: number;
-  /** Owning user's Supabase auth id, once claimed (see `claimAnonymousSessions` below).
-   *  Undefined on records created before Phase 1 (mandatory auth) or not yet claimed. */
+  /** Owning user's Supabase auth id. Always set for rows read back from Supabase. */
   userId?: string;
 }
 
-const STORAGE_KEY = "pra:sessions:v1";
-
-function readAll(): StoredSession[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as StoredSession[]) : [];
-  } catch {
-    return [];
-  }
+interface SessionRow {
+  id: string;
+  user_id: string;
+  name: string;
+  hand_ids: string[] | null;
+  date: string;
 }
 
-function writeAll(sessions: StoredSession[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
-}
-
-export function listSessions(): StoredSession[] {
-  return readAll().sort((a, b) => b.createdAt - a.createdAt);
-}
-
-export function createSession(name: string, handIds: string[]): StoredSession {
-  const sessions = readAll();
-  const record: StoredSession = {
-    id: `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    name,
-    handIds,
-    createdAt: Date.now(),
+function rowToStoredSession(row: SessionRow): StoredSession {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    handIds: row.hand_ids ?? [],
+    createdAt: new Date(row.date).getTime(),
   };
-  sessions.push(record);
-  writeAll(sessions);
-  return record;
 }
 
-export function deleteSession(id: string) {
-  writeAll(readAll().filter((s) => s.id !== id));
+/** Returns the signed-in user, or `null` if nobody is signed in (never throws — callers
+ *  treat "logged out" as "empty result" rather than an error). */
+async function getUserId(): Promise<string | null> {
+  const supabase = createClient();
+  const { data } = await supabase.auth.getUser();
+  return data.user?.id ?? null;
 }
 
-export function clearAllSessions() {
-  writeAll([]);
+export async function listSessions(): Promise<StoredSession[]> {
+  const userId = await getUserId();
+  if (!userId) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select("*")
+    .eq("user_id", userId)
+    .order("date", { ascending: false });
+  if (error || !data) return [];
+  return (data as SessionRow[]).map(rowToStoredSession);
 }
 
-/** Tags every session that doesn't yet have an owner with `userId`. Idempotent — safe to call
- *  on every login. Data stays in `localStorage`; Supabase sync is a later phase. */
-export function claimAnonymousSessions(userId: string): void {
-  const sessions = readAll();
-  let changed = false;
-  for (const session of sessions) {
-    if (session.userId === undefined) {
-      session.userId = userId;
-      changed = true;
-    }
+export async function createSession(name: string, handIds: string[]): Promise<StoredSession> {
+  const supabase = createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) {
+    throw new Error("יש להתחבר כדי לשמור סשן.");
   }
-  if (changed) writeAll(sessions);
+
+  const insertRow = {
+    id: crypto.randomUUID(),
+    user_id: user.id,
+    name,
+    hand_ids: handIds,
+    date: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase.from("sessions").insert(insertRow).select("*").single();
+  if (error || !data) {
+    throw new Error(error?.message ?? "שגיאה בשמירת הסשן.");
+  }
+  return rowToStoredSession(data as SessionRow);
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  const userId = await getUserId();
+  if (!userId) return;
+  const supabase = createClient();
+  const { error } = await supabase.from("sessions").delete().eq("id", id).eq("user_id", userId);
+  if (error) throw error;
+}
+
+export async function clearAllSessions(): Promise<void> {
+  const userId = await getUserId();
+  if (!userId) return;
+  const supabase = createClient();
+  const { error } = await supabase.from("sessions").delete().eq("user_id", userId);
+  if (error) throw error;
 }

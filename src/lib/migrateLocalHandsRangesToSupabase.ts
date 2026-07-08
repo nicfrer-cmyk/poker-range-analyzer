@@ -5,14 +5,13 @@
 // Supabase-backed data layer shipped (src/lib/localHandStore.ts / localRangeStore.ts) into
 // the real `hands`/`ranges` tables, then clears the old localStorage keys.
 //
-// Mirrors the idempotency shape of `claimAllLocalData` (src/lib/claimLocalData.ts) — guarded
-// by a `pra:migrated-to-supabase:<userId>` localStorage flag so it only actually runs once
-// per user per browser — but actually PUSHES rows to Supabase instead of just tagging them
-// with an owner, since `localHandStore`/`localRangeStore` no longer read localStorage at all.
+// Guarded by a `pra:migrated-to-supabase:<userId>` localStorage flag so it only actually runs
+// once per user per browser.
 //
 // This is the only code left that reads the old `pra:hands:v1` / `pra:ranges:v1` keys.
-// Wired into src/components/layout/AuthSync.tsx, alongside (not replacing) the existing
-// claim step for opponents/sessions, which are still localStorage-only.
+// Wired into src/components/layout/AuthSync.tsx, alongside
+// migrateLocalSessionsOpponentsToSupabase.ts (the same idea, one phase later, for
+// sessions/opponents).
 // ---------------------------------------------------------------------------
 
 import { createClient } from "@/lib/supabase/client";

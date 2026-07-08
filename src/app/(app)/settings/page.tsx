@@ -20,12 +20,17 @@ import { canPerformAction } from "@/lib/plan";
 import { track } from "@/lib/analytics";
 
 async function exportAllData() {
-  const [hands, ranges] = await Promise.all([listHands(), listRanges()]);
+  const [hands, ranges, opponents, sessions] = await Promise.all([
+    listHands(),
+    listRanges(),
+    listOpponents(),
+    listSessions(),
+  ]);
   const payload = {
     exportedAt: new Date().toISOString(),
     hands,
-    opponents: listOpponents(),
-    sessions: listSessions(),
+    opponents,
+    sessions,
     ranges,
   };
   downloadTextFile(
@@ -43,9 +48,7 @@ const PUSH_PERMISSION_LABEL: Record<PushPermission, string> = {
 };
 
 async function deleteAllData() {
-  await Promise.all([clearAllHands(), clearAllRanges()]);
-  clearAllOpponents();
-  clearAllSessions();
+  await Promise.all([clearAllHands(), clearAllRanges(), clearAllOpponents(), clearAllSessions()]);
 }
 
 export default function SettingsPage() {

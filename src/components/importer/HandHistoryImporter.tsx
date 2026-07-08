@@ -203,7 +203,7 @@ export function HandHistoryImporter() {
         return;
       }
       const name = sessionName.trim() || defaultSessionName();
-      createSession(name, handIds);
+      await createSession(name, handIds);
       setSessionSavedMessage(`נשמרו ${handIds.length} ידיים לספרייה תחת הסשן "${name}".`);
     } catch {
       setSessionError("שגיאה בשמירת הידיים — נסה שוב.");

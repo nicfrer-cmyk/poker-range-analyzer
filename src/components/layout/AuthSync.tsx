@@ -2,9 +2,8 @@
 
 // ---------------------------------------------------------------------------
 // Runs once when an `(app)` page mounts on an authenticated session:
-//  1. Claims any pre-login localStorage data for this user (see
-//     `src/lib/claimLocalData.ts`) — guarded by a `localStorage` flag so the
-//     scan only actually runs once per user per browser.
+//  1. Pushes any pre-login localStorage data (hands/ranges/sessions/opponents — all four are
+//     Supabase-backed now) into the real tables for this user, once per user per browser.
 //  2. If the login redirect tagged the URL with `?justLoggedIn=1` (set in
 //     `src/app/login/page.tsx`), shows a brief "welcome back" toast with the
 //     user's email, then strips the flag from the URL.
@@ -14,8 +13,8 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import { claimAllLocalData } from "@/lib/claimLocalData";
 import { migrateLocalHandsAndRangesToSupabase } from "@/lib/migrateLocalHandsRangesToSupabase";
+import { migrateLocalSessionsAndOpponentsToSupabase } from "@/lib/migrateLocalSessionsOpponentsToSupabase";
 import { track } from "@/lib/analytics";
 
 /** Today as `YYYY-MM-DD` in the browser's local timezone — good enough for a once-a-day flag,
@@ -45,22 +44,13 @@ export function AuthSync() {
       const user = data.session?.user;
       if (!user) return;
 
-      const claimFlag = `pra:claimed:${user.id}`;
-      try {
-        if (!window.localStorage.getItem(claimFlag)) {
-          claimAllLocalData(user.id);
-          window.localStorage.setItem(claimFlag, "1");
-        }
-      } catch {
-        // localStorage unavailable (e.g. private browsing edge cases) — nothing to do.
-      }
-
-      // Hands/ranges moved from localStorage to Supabase — push whatever this browser still
-      // has sitting in the old localStorage keys into the real tables, once per user per
-      // browser (own flag, own idempotency check — see the file for details). Fire-and-forget
-      // from the caller's perspective: it doesn't block the rest of this effect, and pages that
-      // read hands/ranges already re-fetch from Supabase on their own mount.
+      // Hands/ranges/sessions/opponents all moved from localStorage to Supabase — push whatever
+      // this browser still has sitting in the old localStorage keys into the real tables, once
+      // per user per browser (own flag, own idempotency check — see each file for details).
+      // Fire-and-forget from the caller's perspective: it doesn't block the rest of this effect,
+      // and pages that read this data already re-fetch from Supabase on their own mount.
       void migrateLocalHandsAndRangesToSupabase(user.id);
+      void migrateLocalSessionsAndOpponentsToSupabase(user.id);
 
       // `signup_completed`: fired once, the first time we see a session for this user whose
       // `created_at` and `last_sign_in_at` are within a few seconds of each other — a reliable,
