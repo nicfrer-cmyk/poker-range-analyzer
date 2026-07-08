@@ -1,6 +1,51 @@
+// `'unsafe-inline'` on script-src is required by the small theme-flash-prevention inline
+// script in `src/app/layout.tsx` (a fixed, static string — no user input ever reaches it).
+// `'unsafe-eval'` is added in development only — Next's dev-mode bundler evaluates modules
+// via `eval()` for Fast Refresh/HMR (confirmed live: without it, every page throws
+// "EvalError: ... violates ... 'unsafe-eval' is not an allowed source"). `next build`/`next
+// start` don't use eval-based bundling, so production stays without it, matching Next's own
+// documented CSP guidance. Everything else here is a real restriction with no known
+// functional cost: fonts are self-hosted via next/font (no external font-src needed), and the
+// only cross-origin browser calls are to Supabase's own REST/Auth API.
+const isDev = process.env.NODE_ENV !== "production";
+const CSP = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.supabase.co",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  async headers() {
+    return [
+      {
+        // Excludes /_next/static and /_next/image — matches this project's own
+        // middleware.ts matcher. Applying these headers (CSP in particular) to Next's
+        // internal static-chunk responses interferes with the dev server's on-demand
+        // asset serving (observed: chunk requests 404 only when this source matched
+        // everything). Not a loss in production either way — those responses are
+        // immutable, hashed static files, not top-level documents, so they don't need
+        // page-level security headers.
+        source: "/((?!_next/static|_next/image).*)",
+        headers: [
+          { key: "Content-Security-Policy", value: CSP },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

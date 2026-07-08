@@ -69,8 +69,23 @@ model User {
   sessions      Session[]
   opponents     Opponent[]
   subscription  Subscription?
+  aiUsageDaily  AiUsageDaily[]
 
   @@map("users")
+}
+
+// Server-side counter backing the real daily AI-quota enforcement in
+// src/lib/aiUsage.ts — see that file for why this exists alongside the
+// client-side usageTracker (localStorage) that only drives the UI.
+model AiUsageDaily {
+  userId    String   @map("user_id")
+  usageDate DateTime @map("usage_date") @db.Date
+  count     Int      @default(0)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, usageDate])
+  @@map("ai_usage_daily")
 }
 
 model Hand {
