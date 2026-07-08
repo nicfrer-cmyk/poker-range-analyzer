@@ -26,10 +26,10 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/training", label: "אימון", icon: "spade", section: "coach", mobile: true },
   { href: "/analyze", label: "ניתוח חדש", icon: "spade", section: "tools" },
   { href: "/hands", label: "ספריית ידיים", icon: "book", section: "tools", mobile: true },
-  { href: "/ranges", label: "ספריית טווחים", icon: "grid", section: "tools" },
+  { href: "/ranges", label: "ספריית טווחים", icon: "layers", section: "tools" },
   { href: "/opponents", label: "יריבים", icon: "users", section: "tools" },
   { href: "/leaderboard", label: "אתגרים", icon: "star", section: "tools" },
-  { href: "/billing", label: "מנוי", icon: "star", section: "account" },
+  { href: "/billing", label: "מנוי", icon: "crown", section: "account" },
   { href: "/notifications", label: "התראות", icon: "bell", section: "account" },
   { href: "/settings", label: "הגדרות", icon: "gear", section: "account", mobile: true },
 ];

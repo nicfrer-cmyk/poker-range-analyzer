@@ -125,7 +125,10 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
     if (!pickerTarget) return;
     if (pickerTarget.kind === "hero") {
       setHeroCard(pickerTarget.index, card);
-      setPickerTarget(null);
+      // Flow straight into the other hero slot if it's still empty, instead of closing —
+      // filling one card almost always means the next click would just reopen this same picker.
+      const otherIndex = pickerTarget.index === 0 ? 1 : 0;
+      setPickerTarget(input.heroCards[otherIndex] ? null : { kind: "hero", index: otherIndex });
       return;
     }
     const nextIndex = pickerTarget.indices.find((i) => !input.board[i]);
@@ -196,6 +199,36 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
         <div className="flex justify-end">
           <Badge tone="close">כמעט הגעת למגבלת הניתוחים המהירים היומית בתוכנית החינמית</Badge>
         </div>
+      )}
+
+      {readyForQuick && result && (
+        <>
+          <Panel className="border-accent/30">
+            <PanelBody className="py-2.5 text-xs text-base-muted">
+              מוצג מול טווח יריב סטנדרטי ({villainRangePercent.toFixed(0)}% מהידיים האפשריות) — לניתוח
+              מדויק עם הטווח האמיתי של היריב שלך, המשך לניתוח מתקדם.
+            </PanelBody>
+          </Panel>
+
+          <HeroSummary result={result} />
+
+          {classification && classification.draws.length > 0 && (
+            <Panel>
+              <PanelBody className="text-sm text-base-text">
+                יש לך גם דרואו חי ({drawsToHebrew(classification.draws)}) בשווי של כ-{outs} אאוטים לשיפור.
+              </PanelBody>
+            </Panel>
+          )}
+
+          {saveMessage && <p className="text-sm text-status-risky">{saveMessage}</p>}
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button variant="secondary" onClick={handleSave} disabled={saving}>
+              {saving ? "שומר…" : saved ? "נשמר ✓" : "שמור יד"}
+            </Button>
+            <Button onClick={onContinueToAdvanced}>המשך לניתוח מתקדם</Button>
+          </div>
+        </>
       )}
 
       <Panel>
@@ -273,36 +306,6 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
         <Panel>
           <PanelBody className="py-8 text-center text-sm text-base-muted">מחשב אקוויטי…</PanelBody>
         </Panel>
-      )}
-
-      {readyForQuick && result && (
-        <>
-          <Panel className="border-accent/30">
-            <PanelBody className="py-2.5 text-xs text-base-muted">
-              מוצג מול טווח יריב סטנדרטי ({villainRangePercent.toFixed(0)}% מהידיים האפשריות) — לניתוח
-              מדויק עם הטווח האמיתי של היריב שלך, המשך לניתוח מתקדם.
-            </PanelBody>
-          </Panel>
-
-          <HeroSummary result={result} />
-
-          {classification && classification.draws.length > 0 && (
-            <Panel>
-              <PanelBody className="text-sm text-base-text">
-                יש לך גם דרואו חי ({drawsToHebrew(classification.draws)}) בשווי של כ-{outs} אאוטים לשיפור.
-              </PanelBody>
-            </Panel>
-          )}
-
-          {saveMessage && <p className="text-sm text-status-risky">{saveMessage}</p>}
-
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button variant="secondary" onClick={handleSave} disabled={saving}>
-              {saving ? "שומר…" : saved ? "נשמר ✓" : "שמור יד"}
-            </Button>
-            <Button onClick={onContinueToAdvanced}>המשך לניתוח מתקדם</Button>
-          </div>
-        </>
       )}
     </div>
   );

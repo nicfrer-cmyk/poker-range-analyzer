@@ -15,7 +15,7 @@ export const MADE_TIER_LABEL: Record<MadeTier, string> = {
   "bottom-pair": "זוג תחתון",
   underpair: "זוג נמוך",
   overcards: "קלפים גבוהים",
-  air: "אוויר",
+  air: "יד ריקה (בלי זוג או דרואו)",
 };
 
 export const DRAW_TYPE_LABEL: Record<DrawType, string> = {

@@ -58,6 +58,14 @@ const paths: Record<NavItem["icon"], React.ReactNode> = {
       <path d="M10 19a2 2 0 0 0 4 0" />
     </>
   ),
+  crown: <path d="M4 9l3.5 2.5L12 5l4.5 6.5L20 9l-1.8 9H5.8L4 9Z" />,
+  layers: (
+    <>
+      <path d="M12 3 3 8l9 5 9-5-9-5Z" />
+      <path d="M3 12l9 5 9-5" />
+      <path d="M3 16l9 5 9-5" />
+    </>
+  ),
 };
 
 export function NavIcon({ icon, className }: { icon: NavItem["icon"]; className?: string }) {

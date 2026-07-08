@@ -37,7 +37,7 @@ export function Sidebar() {
                     : "text-base-muted hover:bg-base-panel2 hover:text-base-text"
                 )}
               >
-                <NavIcon icon={item.icon} className="h-4.5 w-4.5 shrink-0" />
+                <NavIcon icon={item.icon} className="h-5 w-5 shrink-0" />
                 {item.label}
               </Link>
             </div>

@@ -13,6 +13,7 @@ import {
   getNotificationSettings,
   type AppNotification,
 } from "@/lib/notifications";
+import { pushNewNotifications } from "@/lib/notificationsPush";
 import { useMockPlan } from "@/lib/useMockPlan";
 import { getTodayCount } from "@/lib/usageTracker";
 import { track } from "@/lib/analytics";
@@ -49,6 +50,9 @@ export function NotificationBell() {
       );
       setNotifications(items);
       setUnreadCount(unreadNotifications(items).length);
+      // Real device popup for anything not yet pushed — a no-op unless the user granted OS
+      // notification permission from Settings. Independent of read/dismissed state in the bell.
+      pushNewNotifications(items);
     });
     return () => {
       cancelled = true;

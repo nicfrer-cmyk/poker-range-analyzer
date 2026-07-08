@@ -79,8 +79,8 @@ function verdictFromEquity(pct: number): { text: string; tone: StatusTone } {
   const tone = equityTone(pct);
   if (tone === "crushing") return { text: "אתה פייבוריט ענק במצב הזה.", tone };
   if (tone === "ahead") return { text: "אתה מוביל במצב הזה.", tone };
-  if (tone === "close") return { text: "זה מטבע באוויר — צמוד מאוד.", tone };
-  if (tone === "risky") return { text: "אתה מאחור, אבל לא הולך למוות.", tone };
+  if (tone === "close") return { text: "זה כמו הטלת מטבע — צמוד מאוד.", tone };
+  if (tone === "risky") return { text: "אתה מאחור, אבל עדיין עם סיכויים סבירים.", tone };
   return { text: "אתה אנדרדוג משמעותי במצב הזה.", tone };
 }
 

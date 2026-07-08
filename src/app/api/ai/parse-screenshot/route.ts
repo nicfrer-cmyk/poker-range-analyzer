@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { ALLOWED_IMAGE_MEDIA_TYPES, MAX_IMAGE_BASE64_LENGTH } from "@/lib/aiImage";
 import type { Card } from "@/lib/engine/types";
 
 // ---------------------------------------------------------------------------
@@ -38,9 +39,6 @@ interface ParseScreenshotRequestBody {
   imageBase64?: string;
   mediaType?: string;
 }
-
-const ALLOWED_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
-const MAX_BASE64_LENGTH = 8_000_000; // ~6MB raw — plenty for a screenshot, caps cost/timeout abuse
 
 function sanitizeCards(cards: unknown, max: number): Card[] | undefined {
   if (!Array.isArray(cards)) return undefined;
@@ -143,10 +141,10 @@ export async function POST(request: NextRequest) {
   if (!imageBase64 || !mediaType) {
     return NextResponse.json({ error: "יש לספק imageBase64 ו-mediaType." }, { status: 400 });
   }
-  if (!ALLOWED_MEDIA_TYPES.has(mediaType)) {
+  if (!ALLOWED_IMAGE_MEDIA_TYPES.has(mediaType)) {
     return NextResponse.json({ error: "סוג קובץ לא נתמך — יש להעלות JPEG, PNG, GIF או WebP." }, { status: 400 });
   }
-  if (imageBase64.length > MAX_BASE64_LENGTH) {
+  if (imageBase64.length > MAX_IMAGE_BASE64_LENGTH) {
     return NextResponse.json({ error: "התמונה גדולה מדי." }, { status: 400 });
   }
 

@@ -1,14 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { ALLOWED_IMAGE_MEDIA_TYPES, MAX_IMAGE_BASE64_LENGTH, type AllowedImageMediaType } from "@/lib/aiImage";
 
 // ---------------------------------------------------------------------------
 // AI Hand Review — post-game only, never live-play.
 //
-// Takes either a structured hand summary (from a saved analysis) or raw
-// pasted hand-history text, and asks Claude for a plain-Hebrew, street-by-
-// street review. Requires ANTHROPIC_API_KEY; without it, returns a clear
-// 501 so the UI can show "not configured yet" instead of a generic failure.
+// Takes a structured hand summary (from a saved analysis), raw pasted hand-
+// history text, OR a table screenshot, and asks Claude for a plain-Hebrew,
+// street-by-street review. For a screenshot, the same call both reads the
+// hand off the image and writes the review — one vision request, not a
+// round-trip through /api/ai/parse-screenshot first. Requires
+// ANTHROPIC_API_KEY; without it, returns a clear 501 so the UI can show
+// "not configured yet" instead of a generic failure.
 //
 // Requires a signed-in Supabase user (same check as /api/grow/checkout) —
 // this calls a paid third-party API on the server's own credentials, and the
@@ -18,12 +22,15 @@ import { createClient } from "@/lib/supabase/server";
 // and bypass the free-plan limit entirely.
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `אתה מאמן פוקר שכותב סקירות יד לשחקנים חובבים ומתקדמים, בעברית פשוטה וברורה.
+const REVIEW_RULES = `אתה מאמן פוקר שכותב סקירות יד לשחקנים חובבים ומתקדמים, בעברית פשוטה וברורה.
 
 חוקים חשובים:
 - זהו ניתוח לימודי לאחר סיום היד בלבד. לעולם אל תיתן המלצה לפעולה "עכשיו" או בזמן אמת — היד כבר הסתיימה.
 - אל תבטיח רווחים או תוצאות כספיות. התמקד בהבנה, בלמידה ובזיהוי דפוסים.
 - כתוב בשפה אנושית וברורה, לא בשפת סולבר טכנית (למשל "אתה פייבוריט ענק" ולא "0.72 אקוויטי בתדירות 0.68").
+- היה תמציתי — 2-4 משפטים לכל סעיף.`;
+
+const TEXT_SYSTEM_PROMPT = `${REVIEW_RULES}
 - ענה בפורמט הבא בדיוק, עם הכותרות האלה:
 
 ## תקציר היד
@@ -31,13 +38,29 @@ const SYSTEM_PROMPT = `אתה מאמן פוקר שכותב סקירות יד ל�
 ## מה Hero עשה
 ## מה היה הסיכון
 ## ידיים רלוונטיות בטווח היריב
-## מה אפשר ללמוד להבא
+## מה אפשר ללמוד להבא`;
 
-היה תמציתי — 2-4 משפטים לכל סעיף.`;
+const IMAGE_SYSTEM_PROMPT = `${REVIEW_RULES}
+- קיבלת צילום מסך של שולחן פוקר, לא טקסט. קודם כול זהה בקצרה את פרטי היד הגלויים בתמונה
+  (קלפי הירו, הבורד, גודל הפוט, הפוזיציה אם ניתן) — ואם משהו לא ברור, ציין זאת בפירוש במקום
+  לנחש. רק אחר כך המשך לניתוח עצמו.
+- אם התמונה אינה שולחן פוקר או שלא ניתן לזהות ממנה שום דבר בביטחון, אמור זאת בבירור בסעיף
+  הראשון ואל תמשיך לנתח.
+- ענה בפורמט הבא בדיוק, עם הכותרות האלה:
+
+## מה זוהה בתמונה
+## תקציר היד
+## נקודת ההחלטה המרכזית
+## מה Hero עשה
+## מה היה הסיכון
+## ידיים רלוונטיות בטווח היריב
+## מה אפשר ללמוד להבא`;
 
 interface HandReviewRequestBody {
   handSummary?: string;
   handHistoryText?: string;
+  imageBase64?: string;
+  mediaType?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -78,16 +101,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "גוף הבקשה אינו JSON תקין." }, { status: 400 });
   }
 
-  const { handSummary, handHistoryText } = body;
+  const { handSummary, handHistoryText, imageBase64, mediaType } = body;
+
+  if (imageBase64 && mediaType) {
+    if (!ALLOWED_IMAGE_MEDIA_TYPES.has(mediaType)) {
+      return NextResponse.json(
+        { error: "סוג קובץ לא נתמך — יש להעלות JPEG, PNG, GIF או WebP." },
+        { status: 400 }
+      );
+    }
+    if (imageBase64.length > MAX_IMAGE_BASE64_LENGTH) {
+      return NextResponse.json({ error: "התמונה גדולה מדי." }, { status: 400 });
+    }
+  }
+
   const userContent = handHistoryText?.trim()
     ? `הנה היסטוריית יד גולמית לניתוח:\n\n${handHistoryText.trim()}`
     : handSummary?.trim()
     ? `הנה תקציר היד לניתוח:\n\n${handSummary.trim()}`
     : null;
 
-  if (!userContent) {
+  if (!userContent && !(imageBase64 && mediaType)) {
     return NextResponse.json(
-      { error: "יש לספק handSummary או handHistoryText לניתוח." },
+      { error: "יש לספק handSummary, handHistoryText או תמונה לניתוח." },
       { status: 400 }
     );
   }
@@ -97,8 +133,26 @@ export async function POST(request: NextRequest) {
     const response = await client.messages.create({
       model: "claude-opus-4-8",
       max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userContent }],
+      system: imageBase64 && mediaType ? IMAGE_SYSTEM_PROMPT : TEXT_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content:
+            imageBase64 && mediaType
+              ? [
+                  {
+                    type: "image" as const,
+                    source: {
+                      type: "base64" as const,
+                      media_type: mediaType as AllowedImageMediaType,
+                      data: imageBase64,
+                    },
+                  },
+                  { type: "text" as const, text: "נתח את היד הנראית בתמונה, לפי ההנחיות שסופקו." },
+                ]
+              : userContent!,
+        },
+      ],
     });
 
     const textBlock = response.content.find((b) => b.type === "text");

@@ -72,7 +72,7 @@ function tooltipForLabel(label: string): string {
 export function RangeBuilder({
   value,
   onChange,
-  title = "הטווח של היריב",
+  title = "שלב 4 · הטווח של היריב",
 }: {
   value: string;
   onChange: (text: string) => void;

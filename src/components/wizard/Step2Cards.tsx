@@ -27,7 +27,10 @@ export function Step2Cards() {
     if (!pickerTarget) return;
     if (pickerTarget.kind === "hero") {
       setHeroCard(pickerTarget.index, card);
-      setPickerTarget(null);
+      // Flow straight into the other hero slot if it's still empty, instead of closing —
+      // filling one card almost always means the next click would just reopen this same picker.
+      const otherIndex = pickerTarget.index === 0 ? 1 : 0;
+      setPickerTarget(input.heroCards[otherIndex] ? null : { kind: "hero", index: otherIndex });
       return;
     }
     const nextIndex = pickerTarget.indices.find((i) => !input.board[i]);

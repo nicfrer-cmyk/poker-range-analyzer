@@ -9,6 +9,7 @@ import { useMockPlan } from "@/lib/useMockPlan";
 import { useTheme } from "@/lib/useTheme";
 import { useNotificationSettings } from "@/lib/useNotificationSettings";
 import { NOTIFICATION_CATEGORY_LABEL, type NotificationCategory, type NotificationFrequency } from "@/lib/notifications";
+import { getPushPermission, requestPushPermission, type PushPermission } from "@/lib/notificationsPush";
 import { listHands, clearAllHands, downloadTextFile } from "@/lib/localHandStore";
 import { listOpponents, clearAllOpponents } from "@/lib/localOpponentStore";
 import { listSessions, clearAllSessions } from "@/lib/localSessionStore";
@@ -34,6 +35,13 @@ async function exportAllData() {
   );
 }
 
+const PUSH_PERMISSION_LABEL: Record<PushPermission, string> = {
+  unsupported: "לא נתמך בדפדפן זה",
+  default: "לא הופעלו עדיין",
+  granted: "פעילות",
+  denied: "חסומות",
+};
+
 async function deleteAllData() {
   await Promise.all([clearAllHands(), clearAllRanges()]);
   clearAllOpponents();
@@ -54,6 +62,16 @@ export default function SettingsPage() {
   const [email, setEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [pushPermission, setPushPermission] = useState<PushPermission>("default");
+
+  useEffect(() => {
+    setPushPermission(getPushPermission());
+  }, []);
+
+  const handleRequestPush = async () => {
+    const result = await requestPushPermission();
+    setPushPermission(result);
+  };
 
   useEffect(() => {
     try {
@@ -150,39 +168,10 @@ export default function SettingsPage() {
 
       <Panel>
         <PanelHeader>
-          <PanelTitle>תוכנית</PanelTitle>
+          <PanelTitle>התוכנית שלי</PanelTitle>
           <Badge tone={plan === "PRO" ? "ahead" : "neutral"}>{plan === "PRO" ? "פרו" : "חינמי"}</Badge>
         </PanelHeader>
         <PanelBody className="space-y-3">
-          <p className="text-sm text-base-muted">
-            עד שהחיוב האמיתי יחובר, אפשר להשתמש במתג הזה כדי להדגים באופן מקומי את ההבדל בין
-            חינמי לפרו.
-          </p>
-          <div className="flex gap-2">
-            <Button variant={plan === "FREE" ? "primary" : "secondary"} size="sm" onClick={() => setPlan("FREE")}>
-              חינמי
-            </Button>
-            <Button variant={plan === "PRO" ? "primary" : "secondary"} size="sm" onClick={() => setPlan("PRO")}>
-              פרו
-            </Button>
-            <Link href="/billing">
-              <Button variant="ghost" size="sm">
-                ניהול המנוי ←
-              </Button>
-            </Link>
-          </div>
-        </PanelBody>
-      </Panel>
-
-      <Panel>
-        <PanelHeader>
-          <PanelTitle>ניהול מנוי</PanelTitle>
-          <Badge tone={plan === "PRO" ? "ahead" : "neutral"}>{plan === "PRO" ? "פרו" : "חינמי"}</Badge>
-        </PanelHeader>
-        <PanelBody className="space-y-2">
-          <p className="text-sm text-base-muted">
-            התוכנית הנוכחית שלך: <span className="font-medium text-base-text">{plan === "PRO" ? "פרו" : "חינמי"}</span>.
-          </p>
           {plan === "PRO" ? (
             <p className="text-sm text-base-muted">
               לניהול המנוי או ביטולו, פנה לתמיכה — עדיין אין חיבור אמיתי לספק תשלומים, כך
@@ -201,6 +190,25 @@ export default function SettingsPage() {
               .
             </p>
           )}
+          <div className="border-t border-base-border pt-3">
+            <p className="mb-2 text-xs text-base-muted">
+              עד שהחיוב האמיתי יחובר, אפשר להשתמש במתג הזה כדי להדגים באופן מקומי את ההבדל בין
+              חינמי לפרו.
+            </p>
+            <div className="flex gap-2">
+              <Button variant={plan === "FREE" ? "primary" : "secondary"} size="sm" onClick={() => setPlan("FREE")}>
+                חינמי
+              </Button>
+              <Button variant={plan === "PRO" ? "primary" : "secondary"} size="sm" onClick={() => setPlan("PRO")}>
+                פרו
+              </Button>
+              <Link href="/billing">
+                <Button variant="ghost" size="sm">
+                  ניהול המנוי ←
+                </Button>
+              </Link>
+            </div>
+          </div>
         </PanelBody>
       </Panel>
 
@@ -267,6 +275,34 @@ export default function SettingsPage() {
                 כבה
               </Button>
             </div>
+          </div>
+
+          <div className="border-t border-base-border pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">פופ-אפ במכשיר</p>
+                <p className="text-sm text-base-muted">
+                  התראות כפופ-אפ אמיתי של המכשיר (התראת מערכת), במקום להסתמך רק על הפעמון בתוך
+                  האפליקציה. עובד כשהאפליקציה פתוחה או פועלת ברקע בדפדפן — לא כשהיא סגורה לגמרי.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge tone={pushPermission === "granted" ? "ahead" : pushPermission === "denied" ? "behind" : "neutral"}>
+                  {PUSH_PERMISSION_LABEL[pushPermission]}
+                </Badge>
+                {pushPermission !== "granted" && pushPermission !== "unsupported" && (
+                  <Button size="sm" onClick={handleRequestPush} disabled={pushPermission === "denied"}>
+                    הפעלה
+                  </Button>
+                )}
+              </div>
+            </div>
+            {pushPermission === "denied" && (
+              <p className="mt-2 text-xs text-status-risky">
+                ההתראות נחסמו ברמת הדפדפן. כדי להפעיל, יש לאשר ידנית דרך הגדרות האתר בדפדפן (סמל
+                המנעול ליד שורת הכתובת).
+              </p>
+            )}
           </div>
 
           <div className="border-t border-base-border pt-4">

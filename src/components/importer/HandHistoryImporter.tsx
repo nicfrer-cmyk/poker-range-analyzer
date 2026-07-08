@@ -16,6 +16,7 @@ import { createSession } from "@/lib/localSessionStore";
 import { useMockPlan } from "@/lib/useMockPlan";
 import { canPerformAction, isNearLimit } from "@/lib/plan";
 import { getTodayCount, incrementToday } from "@/lib/usageTracker";
+import { fileToBase64 } from "@/lib/utils/file";
 import { track } from "@/lib/analytics";
 
 function defaultSessionName(): string {
@@ -68,19 +69,6 @@ function parsedHandToFullInput(hand: ParsedHand): AnalysisInput {
     actionTaken: heroLastAction(hand),
     betSize: 0,
   };
-}
-
-/** Reads a File as a base64 string (no `data:...;base64,` prefix) via FileReader. */
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve(result.slice(result.indexOf(",") + 1));
-    };
-    reader.onerror = () => reject(reader.error ?? new Error("קריאת הקובץ נכשלה"));
-    reader.readAsDataURL(file);
-  });
 }
 
 interface ScreenshotParseResult {

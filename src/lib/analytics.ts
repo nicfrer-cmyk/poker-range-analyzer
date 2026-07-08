@@ -31,6 +31,7 @@ export type AnalyticsEvent =
   | "advanced_analysis_started"
   | "advanced_analysis_completed"
   | "hand_saved"
+  | "hand_review_completed"
   | "tag_added"
   | "notification_opened"
   | "screenshot_parsed"

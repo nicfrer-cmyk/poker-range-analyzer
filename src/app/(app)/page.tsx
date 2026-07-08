@@ -131,6 +131,22 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      <div className="flex flex-wrap gap-3">
+        <Link href="/analyze?mode=quick">
+          <Button size="lg">ניתוח מהיר</Button>
+        </Link>
+        <Link href="/analyze?mode=advanced">
+          <Button variant="secondary" size="lg">
+            ניתוח מתקדם
+          </Button>
+        </Link>
+        <Link href="/hands/import">
+          <Button variant="secondary" size="lg">
+            ייבוא היסטוריה
+          </Button>
+        </Link>
+      </div>
+
       <Panel>
         <PanelBody className="flex flex-wrap items-center gap-2 py-2.5 text-sm">
           <Badge tone="neutral" className="shrink-0">
@@ -185,45 +201,14 @@ export default function DashboardPage() {
 
       {!hasData ? (
         <Panel>
-          <PanelBody className="space-y-4 py-10 text-center">
+          <PanelBody className="py-10 text-center">
             <p className="text-sm text-base-muted">
               עדיין אין מספיק נתונים כדי לבנות לך פרופיל אישי. נתח 3 ידיים ראשונות כדי להתחיל.
             </p>
-            <div className="flex flex-wrap justify-center gap-3">
-              <Link href="/analyze?mode=quick">
-                <Button size="lg">ניתוח מהיר</Button>
-              </Link>
-              <Link href="/analyze?mode=advanced">
-                <Button variant="secondary" size="lg">
-                  ניתוח מתקדם
-                </Button>
-              </Link>
-              <Link href="/hands/import">
-                <Button variant="secondary" size="lg">
-                  ייבוא היסטוריה
-                </Button>
-              </Link>
-            </div>
           </PanelBody>
         </Panel>
       ) : (
         <>
-          <div className="flex flex-wrap gap-3">
-            <Link href="/analyze?mode=quick">
-              <Button size="lg">ניתוח מהיר</Button>
-            </Link>
-            <Link href="/analyze?mode=advanced">
-              <Button variant="secondary" size="lg">
-                ניתוח מתקדם
-              </Button>
-            </Link>
-            <Link href="/hands/import">
-              <Button variant="secondary" size="lg">
-                ייבוא היסטוריה
-              </Button>
-            </Link>
-          </div>
-
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Panel>
               <PanelBody>
@@ -398,7 +383,7 @@ export default function DashboardPage() {
               <div className="flex flex-wrap gap-2">
                 <Link href="/ai-review">
                   <Button variant="secondary" size="sm">
-                    ניתוח יד עם AI
+                    ניתוח יד עם AI (כולל העלאת תמונה)
                   </Button>
                 </Link>
               </div>
