@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { checkAndIncrementAiQuota } from "@/lib/aiUsage";
 import { ALLOWED_IMAGE_MEDIA_TYPES, MAX_IMAGE_BASE64_LENGTH } from "@/lib/aiImage";
 import type { Card } from "@/lib/engine/types";
 
@@ -10,9 +11,10 @@ import type { Card } from "@/lib/engine/types";
 // model. Claude's vision input covers that: given a table screenshot, ask it
 // to read back hero cards / board / pot / position as strict JSON.
 //
-// Same auth + ANTHROPIC_API_KEY gating as /api/ai/hand-review, and for the
-// same reason — this is a paid third-party API call on the server's own
-// credentials, so it must not be reachable by a signed-out caller.
+// Same auth + quota + ANTHROPIC_API_KEY gating as /api/ai/hand-review, and
+// for the same reason — this is a paid third-party API call on the server's
+// own credentials, so it must not be reachable by a signed-out caller, and
+// shares that route's daily quota (both spend the same Anthropic budget).
 // ---------------------------------------------------------------------------
 
 const CARD_RE = /^[2-9TJQKA][shdc]$/;
@@ -103,6 +105,7 @@ function sanitizeModelOutput(raw: unknown): ParsedScreenshot {
 }
 
 export async function POST(request: NextRequest) {
+  let userId: string;
   try {
     const supabase = await createClient();
     const {
@@ -112,6 +115,7 @@ export async function POST(request: NextRequest) {
     if (error || !user) {
       return NextResponse.json({ error: "יש להתחבר כדי לנתח צילום מסך." }, { status: 401 });
     }
+    userId = user.id;
   } catch (err) {
     if (err instanceof Error && err.message.startsWith("Supabase is not configured")) {
       return NextResponse.json(
@@ -120,6 +124,11 @@ export async function POST(request: NextRequest) {
       );
     }
     throw err;
+  }
+
+  const quota = await checkAndIncrementAiQuota(userId);
+  if (!quota.allowed) {
+    return NextResponse.json({ error: quota.reason }, { status: 429 });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;

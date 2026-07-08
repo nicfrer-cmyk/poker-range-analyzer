@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { checkAndIncrementAiQuota } from "@/lib/aiUsage";
 import { ALLOWED_IMAGE_MEDIA_TYPES, MAX_IMAGE_BASE64_LENGTH, type AllowedImageMediaType } from "@/lib/aiImage";
 
 // ---------------------------------------------------------------------------
@@ -10,16 +11,17 @@ import { ALLOWED_IMAGE_MEDIA_TYPES, MAX_IMAGE_BASE64_LENGTH, type AllowedImageMe
 // history text, OR a table screenshot, and asks Claude for a plain-Hebrew,
 // street-by-street review. For a screenshot, the same call both reads the
 // hand off the image and writes the review — one vision request, not a
-// round-trip through /api/ai/parse-screenshot first. Requires
-// ANTHROPIC_API_KEY; without it, returns a clear 501 so the UI can show
-// "not configured yet" instead of a generic failure.
+// round-trip through /api/ai/parse-screenshot first, so an image-based
+// review only spends one unit of the shared daily AI quota, same as a text
+// one. Requires ANTHROPIC_API_KEY; without it, returns a clear 501 so the UI
+// can show "not configured yet" instead of a generic failure.
 //
 // Requires a signed-in Supabase user (same check as /api/grow/checkout) —
-// this calls a paid third-party API on the server's own credentials, and the
-// daily free-tier limit (see lib/plan.ts's dailyAiReviewLimit) is enforced
-// only client-side in ai-review/page.tsx, so without this check anyone on
-// the internet could hit this route directly to run up the Anthropic bill
-// and bypass the free-plan limit entirely.
+// this calls a paid third-party API on the server's own credentials. The
+// daily free-tier limit is enforced for real here via checkAndIncrementAiQuota
+// (see lib/aiUsage.ts), against the user's actual `users.plan` — not just the
+// client-side localStorage counter in ai-review/page.tsx, which only drives
+// the UI and is trivially bypassable by calling this route directly.
 // ---------------------------------------------------------------------------
 
 const REVIEW_RULES = `אתה מאמן פוקר שכותב סקירות יד לשחקנים חובבים ומתקדמים, בעברית פשוטה וברורה.
@@ -64,6 +66,7 @@ interface HandReviewRequestBody {
 }
 
 export async function POST(request: NextRequest) {
+  let userId: string;
   try {
     const supabase = await createClient();
     const {
@@ -73,6 +76,7 @@ export async function POST(request: NextRequest) {
     if (error || !user) {
       return NextResponse.json({ error: "יש להתחבר כדי להשתמש בניתוח ה-AI." }, { status: 401 });
     }
+    userId = user.id;
   } catch (err) {
     if (err instanceof Error && err.message.startsWith("Supabase is not configured")) {
       return NextResponse.json(
@@ -81,6 +85,11 @@ export async function POST(request: NextRequest) {
       );
     }
     throw err;
+  }
+
+  const quota = await checkAndIncrementAiQuota(userId);
+  if (!quota.allowed) {
+    return NextResponse.json({ error: quota.reason }, { status: 429 });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
