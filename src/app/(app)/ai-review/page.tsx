@@ -51,7 +51,7 @@ export default function AiReviewPage() {
   const [plan] = useMockPlan();
 
   useEffect(() => {
-    setHands(listHands());
+    listHands().then(setHands);
   }, []);
 
   const runReview = async () => {

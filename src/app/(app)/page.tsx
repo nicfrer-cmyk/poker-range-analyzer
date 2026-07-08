@@ -52,7 +52,7 @@ export default function DashboardPage() {
   const [plan] = useMockPlan();
 
   useEffect(() => {
-    setHands(listHands());
+    listHands().then(setHands);
     setProgress(loadProgress());
   }, []);
 

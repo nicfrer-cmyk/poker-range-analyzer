@@ -18,13 +18,14 @@ import { signOut } from "@/lib/supabase/auth-actions";
 import { canPerformAction } from "@/lib/plan";
 import { track } from "@/lib/analytics";
 
-function exportAllData() {
+async function exportAllData() {
+  const [hands, ranges] = await Promise.all([listHands(), listRanges()]);
   const payload = {
     exportedAt: new Date().toISOString(),
-    hands: listHands(),
+    hands,
     opponents: listOpponents(),
     sessions: listSessions(),
-    ranges: listRanges(),
+    ranges,
   };
   downloadTextFile(
     `poker-range-analyzer-export-${new Date().toISOString().slice(0, 10)}.json`,
@@ -33,11 +34,10 @@ function exportAllData() {
   );
 }
 
-function deleteAllData() {
-  clearAllHands();
+async function deleteAllData() {
+  await Promise.all([clearAllHands(), clearAllRanges()]);
   clearAllOpponents();
   clearAllSessions();
-  clearAllRanges();
 }
 
 export default function SettingsPage() {
@@ -46,7 +46,11 @@ export default function SettingsPage() {
   const [notificationSettings, setNotificationSettings] = useNotificationSettings();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleted, setDeleted] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [exportGateMessage, setExportGateMessage] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
@@ -73,20 +77,36 @@ export default function SettingsPage() {
     window.location.reload();
   };
 
-  const handleDeleteAll = () => {
-    deleteAllData();
-    setConfirmingDelete(false);
-    setDeleted(true);
+  const handleDeleteAll = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAllData();
+      setConfirmingDelete(false);
+      setDeleted(true);
+    } catch {
+      setDeleteError("שגיאה במחיקת הנתונים — נסה שוב.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
-  const handleExportAll = () => {
+  const handleExportAll = async () => {
     const gate = canPerformAction(plan, "exportData");
     if (!gate.allowed) {
       setExportGateMessage(gate.reason ?? "ייצוא נתונים זמין רק במסלול פרו.");
       return;
     }
     setExportGateMessage(null);
-    exportAllData();
+    setExportError(null);
+    setExporting(true);
+    try {
+      await exportAllData();
+    } catch {
+      setExportError("שגיאה בייצוא הנתונים — נסה שוב.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -309,8 +329,8 @@ export default function SettingsPage() {
                 קובץ JSON אחד עם כל הידיים, הטווחים, הסשנים ופרופילי היריבים ששמרת.
               </p>
             </div>
-            <Button variant="secondary" size="sm" onClick={handleExportAll}>
-              ייצוא הכל
+            <Button variant="secondary" size="sm" onClick={handleExportAll} disabled={exporting}>
+              {exporting ? "מייצא…" : "ייצוא הכל"}
             </Button>
           </div>
           {exportGateMessage && (
@@ -324,6 +344,7 @@ export default function SettingsPage() {
               </Link>
             </div>
           )}
+          {exportError && <p className="text-sm text-status-risky">{exportError}</p>}
 
           <div className="border-t border-base-border pt-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -340,11 +361,11 @@ export default function SettingsPage() {
                 </Button>
               ) : (
                 <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
+                  <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
                     ביטול
                   </Button>
-                  <Button variant="danger" size="sm" onClick={handleDeleteAll}>
-                    אישור מחיקה סופית
+                  <Button variant="danger" size="sm" onClick={handleDeleteAll} disabled={deleting}>
+                    {deleting ? "מוחק…" : "אישור מחיקה סופית"}
                   </Button>
                 </div>
               )}
@@ -352,6 +373,7 @@ export default function SettingsPage() {
             {deleted && (
               <p className="mt-2 text-sm text-status-ahead">כל הנתונים נמחקו מהמכשיר הזה.</p>
             )}
+            {deleteError && <p className="mt-2 text-sm text-status-risky">{deleteError}</p>}
           </div>
         </PanelBody>
       </Panel>

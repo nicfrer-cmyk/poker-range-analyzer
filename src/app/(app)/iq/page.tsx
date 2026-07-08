@@ -25,7 +25,7 @@ export default function PokerIqPage() {
   const [history, setHistory] = useState<IqSnapshot[]>([]);
 
   useEffect(() => {
-    setHands(listHands());
+    listHands().then(setHands);
     setProgress(loadProgress());
   }, []);
 

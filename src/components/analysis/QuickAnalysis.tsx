@@ -42,6 +42,7 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [computing, setComputing] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [plan] = useMockPlan();
   const [paywallMessage, setPaywallMessage] = useState<string | null>(null);
@@ -154,23 +155,31 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
       ? pickerTarget.indices.filter((i) => !input.board[i]).length
       : 0;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!result) return;
-    const gate = canPerformAction(plan, "saveHand", listHands().length);
-    if (!gate.allowed) {
-      setSaveMessage(gate.reason ?? "לא ניתן לשמור עוד ידיים במסלול הזה.");
-      return;
+    setSaving(true);
+    try {
+      const hands = await listHands();
+      const gate = canPerformAction(plan, "saveHand", hands.length);
+      if (!gate.allowed) {
+        setSaveMessage(gate.reason ?? "לא ניתן לשמור עוד ידיים במסלול הזה.");
+        return;
+      }
+      setSaveMessage(null);
+      await saveHand({
+        input,
+        result,
+        action: input.actionTaken,
+        position: input.heroPosition,
+        analysisMode: "quick",
+      });
+      track("hand_saved", { analysisMode: "quick" });
+      setSaved(true);
+    } catch {
+      setSaveMessage("שגיאה בשמירת היד — נסה שוב.");
+    } finally {
+      setSaving(false);
     }
-    setSaveMessage(null);
-    saveHand({
-      input,
-      result,
-      action: input.actionTaken,
-      position: input.heroPosition,
-      analysisMode: "quick",
-    });
-    track("hand_saved", { analysisMode: "quick" });
-    setSaved(true);
   };
 
   return (
@@ -288,8 +297,8 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
           {saveMessage && <p className="text-sm text-status-risky">{saveMessage}</p>}
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button variant="secondary" onClick={handleSave}>
-              {saved ? "נשמר ✓" : "שמור יד"}
+            <Button variant="secondary" onClick={handleSave} disabled={saving}>
+              {saving ? "שומר…" : saved ? "נשמר ✓" : "שמור יד"}
             </Button>
             <Button onClick={onContinueToAdvanced}>המשך לניתוח מתקדם</Button>
           </div>

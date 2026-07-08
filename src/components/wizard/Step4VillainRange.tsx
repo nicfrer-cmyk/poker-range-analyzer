@@ -12,7 +12,23 @@ export function Step4VillainRange() {
   const { input, setVillainRangeText } = useAnalysisStore();
   const [name, setName] = useState("");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const percent = rangeSelectionPercent(input.villainRangeText);
+
+  const handleSaveRange = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await saveRange(name.trim(), input.villainRangeText);
+      setSaved(true);
+    } catch {
+      setError("שגיאה בשמירת הטווח — נסה שוב.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -33,18 +49,11 @@ export function Step4VillainRange() {
               placeholder="שם לטווח המותאם"
               className="rounded-lg border border-base-border bg-base-panel2 px-2.5 py-1.5 text-sm outline-none focus:border-accent"
             />
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                if (!name.trim()) return;
-                saveRange(name.trim(), input.villainRangeText);
-                setSaved(true);
-              }}
-            >
-              {saved ? "נשמר ✓" : "שמור טווח מותאם"}
+            <Button size="sm" variant="secondary" onClick={handleSaveRange} disabled={saving}>
+              {saving ? "שומר…" : saved ? "נשמר ✓" : "שמור טווח מותאם"}
             </Button>
           </div>
+          {error && <span className="text-xs text-status-risky">{error}</span>}
         </PanelBody>
       </Panel>
     </div>

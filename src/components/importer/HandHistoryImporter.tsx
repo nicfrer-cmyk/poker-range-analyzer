@@ -102,6 +102,8 @@ export function HandHistoryImporter() {
   const [gateMessage, setGateMessage] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState(defaultSessionName());
   const [sessionSavedMessage, setSessionSavedMessage] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [savingSession, setSavingSession] = useState(false);
   const nearImportLimit = isNearLimit(plan, "importHand", getTodayCount("import"));
 
   const handleScreenshot = async (files: FileList | null) => {
@@ -182,34 +184,44 @@ export function HandHistoryImporter() {
     setParsed(parseBulkHandHistories(combined));
   };
 
-  /** Saves every currently-parsed hand to the local hand library and groups the resulting
-   *  hand IDs into a new session, so a batch import shows up as one session in Session Review
-   *  rather than a pile of unrelated hands. */
-  const saveAllAsSession = () => {
-    const handIds = parsed
-      .map((hand) => {
-        const input = parsedHandToFullInput(hand);
-        const result = runAnalysis(input);
-        if (!result) return null;
-        const stored = saveHand({
-          input,
-          result,
-          action: input.actionTaken,
-          position: hand.heroPosition,
-          source: "imported",
-          streetActions: hand.actions,
-        });
-        return stored.id;
-      })
-      .filter((id): id is string => Boolean(id));
+  /** Saves every currently-parsed hand to the hand library and groups the resulting hand IDs
+   *  into a new session, so a batch import shows up as one session in Session Review rather
+   *  than a pile of unrelated hands. */
+  const saveAllAsSession = async () => {
+    setSavingSession(true);
+    setSessionError(null);
+    setSessionSavedMessage(null);
+    try {
+      const results = await Promise.all(
+        parsed.map(async (hand) => {
+          const input = parsedHandToFullInput(hand);
+          const result = runAnalysis(input);
+          if (!result) return null;
+          const stored = await saveHand({
+            input,
+            result,
+            action: input.actionTaken,
+            position: hand.heroPosition,
+            source: "imported",
+            streetActions: hand.actions,
+          });
+          return stored.id;
+        })
+      );
+      const handIds = results.filter((id): id is string => Boolean(id));
 
-    if (handIds.length === 0) {
-      setSessionSavedMessage("לא נמצאו ידיים תקינות לשמירה (חסרים קלפי הירו).");
-      return;
+      if (handIds.length === 0) {
+        setSessionSavedMessage("לא נמצאו ידיים תקינות לשמירה (חסרים קלפי הירו).");
+        return;
+      }
+      const name = sessionName.trim() || defaultSessionName();
+      createSession(name, handIds);
+      setSessionSavedMessage(`נשמרו ${handIds.length} ידיים לספרייה תחת הסשן "${name}".`);
+    } catch {
+      setSessionError("שגיאה בשמירת הידיים — נסה שוב.");
+    } finally {
+      setSavingSession(false);
     }
-    const name = sessionName.trim() || defaultSessionName();
-    createSession(name, handIds);
-    setSessionSavedMessage(`נשמרו ${handIds.length} ידיים לספרייה תחת הסשן "${name}".`);
   };
 
   const loadIntoAnalyzer = (hand: ParsedHand) => {
@@ -320,12 +332,13 @@ export function HandHistoryImporter() {
                 placeholder="שם הסשן"
                 className="min-w-[200px] flex-1 rounded-lg border border-base-border bg-base-panel2 px-2.5 py-1.5 text-sm outline-none focus:border-accent"
               />
-              <Button size="sm" onClick={saveAllAsSession}>
-                שמירת כל הידיים לספרייה כסשן חדש
+              <Button size="sm" onClick={saveAllAsSession} disabled={savingSession}>
+                {savingSession ? "שומר…" : "שמירת כל הידיים לספרייה כסשן חדש"}
               </Button>
               {sessionSavedMessage && (
                 <span className="text-xs text-base-muted">{sessionSavedMessage}</span>
               )}
+              {sessionError && <span className="text-xs text-status-risky">{sessionError}</span>}
             </PanelBody>
           </Panel>
 

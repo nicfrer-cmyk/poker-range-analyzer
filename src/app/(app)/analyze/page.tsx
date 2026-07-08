@@ -74,6 +74,8 @@ function AnalyzePageInner() {
   }>({ best: [], worst: [] });
   const [computingDeep, setComputingDeep] = useState(false);
   const [selectedComboLabel, setSelectedComboLabel] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const countedHandKey = useRef<string | null>(null);
 
   const readyToAnalyze =
@@ -156,6 +158,33 @@ function AnalyzePageInner() {
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showDeep, heroCard0, heroCard1, boardKey, input.villainRangeText]);
+
+  const handleSaveAdvanced = async () => {
+    if (!result) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const hands = await listHands();
+      const gate = canPerformAction(plan, "saveHand", hands.length);
+      if (!gate.allowed) {
+        setGateMessage(gate.reason ?? "לא ניתן לשמור עוד ידיים במסלול הזה.");
+        return;
+      }
+      await saveHand({
+        input,
+        result,
+        action: input.actionTaken,
+        position: input.heroPosition,
+        analysisMode: "advanced",
+      });
+      track("hand_saved", { analysisMode: "advanced" });
+      setSaved(true);
+    } catch {
+      setSaveError("שגיאה בשמירת הניתוח — נסה שוב.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const tooltipFor = useMemo(
     () => (label: string) => {
@@ -283,26 +312,9 @@ function AnalyzePageInner() {
                   />
 
                   <div className="flex flex-wrap items-center justify-end gap-2">
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        const gate = canPerformAction(plan, "saveHand", listHands().length);
-                        if (!gate.allowed) {
-                          setGateMessage(gate.reason ?? "לא ניתן לשמור עוד ידיים במסלול הזה.");
-                          return;
-                        }
-                        saveHand({
-                          input,
-                          result,
-                          action: input.actionTaken,
-                          position: input.heroPosition,
-                          analysisMode: "advanced",
-                        });
-                        track("hand_saved", { analysisMode: "advanced" });
-                        setSaved(true);
-                      }}
-                    >
-                      {saved ? "נשמר ✓" : "שמור ניתוח"}
+                    {saveError && <span className="text-sm text-status-risky">{saveError}</span>}
+                    <Button variant="secondary" onClick={handleSaveAdvanced} disabled={saving}>
+                      {saving ? "שומר…" : saved ? "נשמר ✓" : "שמור ניתוח"}
                     </Button>
                   </div>
 

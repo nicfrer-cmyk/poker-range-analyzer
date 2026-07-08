@@ -32,10 +32,16 @@ export default function RangeLibraryPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editCombos, setEditCombos] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setCustomRanges(listRanges());
+    listRanges().then(setCustomRanges);
   }, []);
+
+  const refreshRanges = async () => {
+    setCustomRanges(await listRanges());
+  };
 
   const loadIntoAnalyzer = (combos: string) => {
     useAnalysisStore.getState().setVillainRangeText(combos);
@@ -48,16 +54,26 @@ export default function RangeLibraryPage() {
     setEditCombos(r.combos);
   };
 
-  const saveEditing = () => {
+  const saveEditing = async () => {
     if (!editingId) return;
-    updateRange(editingId, { name: editName.trim() || undefined, combos: editCombos.trim() || undefined });
-    setCustomRanges(listRanges());
-    setEditingId(null);
+    setError(null);
+    try {
+      await updateRange(editingId, { name: editName.trim() || undefined, combos: editCombos.trim() || undefined });
+      await refreshRanges();
+      setEditingId(null);
+    } catch {
+      setError("שגיאה בשמירת הטווח — נסה שוב.");
+    }
   };
 
-  const duplicateRange = (r: StoredRange) => {
-    saveRange(`${r.name} (עותק)`, r.combos);
-    setCustomRanges(listRanges());
+  const duplicateRange = async (r: StoredRange) => {
+    setError(null);
+    try {
+      await saveRange(`${r.name} (עותק)`, r.combos);
+      await refreshRanges();
+    } catch {
+      setError("שגיאה בשכפול הטווח — נסה שוב.");
+    }
   };
 
   return (
@@ -110,17 +126,27 @@ export default function RangeLibraryPage() {
             />
             <Button
               size="sm"
-              onClick={() => {
+              disabled={saving}
+              onClick={async () => {
                 if (!newName || !newCombos) return;
-                saveRange(newName, newCombos);
-                setCustomRanges(listRanges());
-                setNewName("");
-                setNewCombos("");
+                setError(null);
+                setSaving(true);
+                try {
+                  await saveRange(newName, newCombos);
+                  await refreshRanges();
+                  setNewName("");
+                  setNewCombos("");
+                } catch {
+                  setError("שגיאה בשמירת הטווח — נסה שוב.");
+                } finally {
+                  setSaving(false);
+                }
               }}
             >
-              שמירת טווח
+              {saving ? "שומר…" : "שמירת טווח"}
             </Button>
           </div>
+          {error && <p className="text-sm text-status-risky">{error}</p>}
           {customRanges.length === 0 ? (
             <p className="text-sm text-base-muted">עדיין אין טווחים מותאמים אישית שמורים.</p>
           ) : (
@@ -173,9 +199,14 @@ export default function RangeLibraryPage() {
                         <Button
                           size="sm"
                           variant="danger"
-                          onClick={() => {
-                            deleteRange(r.id);
-                            setCustomRanges(listRanges());
+                          onClick={async () => {
+                            setError(null);
+                            try {
+                              await deleteRange(r.id);
+                              await refreshRanges();
+                            } catch {
+                              setError("שגיאה במחיקת הטווח — נסה שוב.");
+                            }
                           }}
                         >
                           מחיקה

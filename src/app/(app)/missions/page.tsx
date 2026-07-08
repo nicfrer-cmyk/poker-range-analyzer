@@ -40,7 +40,7 @@ export default function MissionsPage() {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
 
   useEffect(() => {
-    setHands(listHands());
+    listHands().then(setHands);
     setProgress(loadProgress());
   }, []);
 

@@ -49,7 +49,7 @@ export default function PokerDnaPage() {
   const [hands, setHands] = useState<StoredHand[]>([]);
 
   useEffect(() => {
-    setHands(listHands());
+    listHands().then(setHands);
   }, []);
 
   const dna = useMemo(() => computePokerDNA(hands), [hands]);
