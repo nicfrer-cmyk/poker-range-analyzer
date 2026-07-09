@@ -29,20 +29,29 @@ export function CardsToWatch({
   best: NextCardOutlook[];
   worst: NextCardOutlook[];
 }) {
+  const hasData = best.length > 0 || worst.length > 0;
   return (
     <Panel>
       <PanelHeader>
         <PanelTitle>קלפים לצפות להם</PanelTitle>
       </PanelHeader>
       <PanelBody className="space-y-4">
-        <div>
-          <p className="mb-2 text-xs font-medium text-status-ahead">הקלפים הטובים ביותר</p>
-          <Row items={best} positive />
-        </div>
-        <div>
-          <p className="mb-2 text-xs font-medium text-status-behind">הקלפים המסוכנים ביותר</p>
-          <Row items={worst} positive={false} />
-        </div>
+        {hasData ? (
+          <>
+            <div>
+              <p className="mb-2 text-xs font-medium text-status-ahead">הקלפים הטובים ביותר</p>
+              <Row items={best} positive />
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-medium text-status-behind">הקלפים המסוכנים ביותר</p>
+              <Row items={worst} positive={false} />
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-base-muted">
+            אין עוד קלף הבא לצפות בו — היד כבר הגיעה לריינד, או שעדיין לא נבחר בורד.
+          </p>
+        )}
       </PanelBody>
     </Panel>
   );

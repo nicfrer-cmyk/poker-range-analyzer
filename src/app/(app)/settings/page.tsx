@@ -5,19 +5,22 @@ import Link from "next/link";
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { useMockPlan } from "@/lib/useMockPlan";
+import { usePlan, useDevPlanOverride } from "@/lib/usePlan";
 import { useTheme } from "@/lib/useTheme";
 import { useNotificationSettings } from "@/lib/useNotificationSettings";
 import { NOTIFICATION_CATEGORY_LABEL, type NotificationCategory, type NotificationFrequency } from "@/lib/notifications";
-import { getPushPermission, requestPushPermission, type PushPermission } from "@/lib/notificationsPush";
+import { getPushPermission, requestPushPermission, sendTestNotification, checkAndPushNotifications, type PushPermission } from "@/lib/notificationsPush";
 import { listHands, clearAllHands, downloadTextFile } from "@/lib/localHandStore";
 import { listOpponents, clearAllOpponents } from "@/lib/localOpponentStore";
 import { listSessions, clearAllSessions } from "@/lib/localSessionStore";
 import { listRanges, clearAllRanges } from "@/lib/localRangeStore";
+import { listEntries as listBankrollEntries, clearAllBankrollEntries } from "@/lib/localBankrollStore";
 import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/lib/supabase/auth-actions";
 import { canPerformAction } from "@/lib/plan";
 import { track } from "@/lib/analytics";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 async function exportAllData() {
   const [hands, ranges, opponents, sessions] = await Promise.all([
@@ -26,12 +29,14 @@ async function exportAllData() {
     listOpponents(),
     listSessions(),
   ]);
+  const bankroll = listBankrollEntries();
   const payload = {
     exportedAt: new Date().toISOString(),
     hands,
     opponents,
     sessions,
     ranges,
+    bankroll,
   };
   downloadTextFile(
     `poker-range-analyzer-export-${new Date().toISOString().slice(0, 10)}.json`,
@@ -49,10 +54,12 @@ const PUSH_PERMISSION_LABEL: Record<PushPermission, string> = {
 
 async function deleteAllData() {
   await Promise.all([clearAllHands(), clearAllRanges(), clearAllOpponents(), clearAllSessions()]);
+  clearAllBankrollEntries();
 }
 
 export default function SettingsPage() {
-  const [plan, setPlan] = useMockPlan();
+  const { plan } = usePlan();
+  const [devOverride, setDevOverride] = useDevPlanOverride();
   const [theme, setTheme] = useTheme();
   const [notificationSettings, setNotificationSettings] = useNotificationSettings();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -66,6 +73,8 @@ export default function SettingsPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [pushPermission, setPushPermission] = useState<PushPermission>("default");
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testSent, setTestSent] = useState(false);
 
   useEffect(() => {
     setPushPermission(getPushPermission());
@@ -74,6 +83,23 @@ export default function SettingsPage() {
   const handleRequestPush = async () => {
     const result = await requestPushPermission();
     setPushPermission(result);
+    if (result === "granted") {
+      // Granting alone used to produce zero visible feedback — the bell's own check had
+      // already run (and found permission not yet granted) before the user got here. Run a
+      // real check-and-push cycle immediately so a genuinely-due notification fires right now.
+      await checkAndPushNotifications(plan);
+    }
+  };
+
+  const handleSendTest = async () => {
+    setSendingTest(true);
+    setTestSent(false);
+    try {
+      const sent = await sendTestNotification();
+      setTestSent(sent);
+    } finally {
+      setSendingTest(false);
+    }
   };
 
   useEffect(() => {
@@ -193,24 +219,41 @@ export default function SettingsPage() {
               .
             </p>
           )}
-          <div className="border-t border-base-border pt-3">
-            <p className="mb-2 text-xs text-base-muted">
-              עד שהחיוב האמיתי יחובר, אפשר להשתמש במתג הזה כדי להדגים באופן מקומי את ההבדל בין
-              חינמי לפרו.
-            </p>
-            <div className="flex gap-2">
-              <Button variant={plan === "FREE" ? "primary" : "secondary"} size="sm" onClick={() => setPlan("FREE")}>
-                חינמי
-              </Button>
-              <Button variant={plan === "PRO" ? "primary" : "secondary"} size="sm" onClick={() => setPlan("PRO")}>
-                פרו
-              </Button>
-              <Link href="/billing">
-                <Button variant="ghost" size="sm">
-                  ניהול המנוי ←
+          {isDev && (
+            <div className="border-t border-base-border pt-3">
+              <p className="mb-2 text-xs text-base-muted">
+                מצב פיתוח בלבד (לא מופיע בגרסת הייצור): מתג מקומי להדגמת ההבדל בין חינמי לפרו
+                בלי מנוי אמיתי.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={devOverride === "FREE" ? "primary" : "secondary"}
+                  size="sm"
+                  onClick={() => setDevOverride("FREE")}
+                >
+                  חינמי (פיתוח)
                 </Button>
-              </Link>
+                <Button
+                  variant={devOverride === "PRO" ? "primary" : "secondary"}
+                  size="sm"
+                  onClick={() => setDevOverride("PRO")}
+                >
+                  פרו (פיתוח)
+                </Button>
+                {devOverride && (
+                  <Button variant="ghost" size="sm" onClick={() => setDevOverride(null)}>
+                    חזרה לתוכנית האמיתית
+                  </Button>
+                )}
+              </div>
             </div>
+          )}
+          <div className="border-t border-base-border pt-3">
+            <Link href="/billing">
+              <Button variant="ghost" size="sm">
+                ניהול המנוי ←
+              </Button>
+            </Link>
           </div>
         </PanelBody>
       </Panel>
@@ -306,6 +349,14 @@ export default function SettingsPage() {
                 המנעול ליד שורת הכתובת).
               </p>
             )}
+            {pushPermission === "granted" && (
+              <div className="mt-2 flex items-center gap-2">
+                <Button variant="secondary" size="sm" onClick={handleSendTest} disabled={sendingTest}>
+                  {sendingTest ? "שולח…" : "שליחת התראת בדיקה"}
+                </Button>
+                {testSent && <span className="text-xs text-status-ahead">נשלחה! אמורה לקפוץ עכשיו.</span>}
+              </div>
+            )}
           </div>
 
           <div className="border-t border-base-border pt-4">
@@ -365,7 +416,7 @@ export default function SettingsPage() {
             <div>
               <p className="text-sm font-medium">ייצוא כל הנתונים</p>
               <p className="text-sm text-base-muted">
-                קובץ JSON אחד עם כל הידיים, הטווחים, הסשנים ופרופילי היריבים ששמרת.
+                קובץ JSON אחד עם כל הידיים, הטווחים, הסשנים, פרופילי היריבים ויומן הבנקרול ששמרת.
               </p>
             </div>
             <Button variant="secondary" size="sm" onClick={handleExportAll} disabled={exporting}>
@@ -390,8 +441,8 @@ export default function SettingsPage() {
               <div>
                 <p className="text-sm font-medium text-status-risky">מחיקת כל הנתונים שלי</p>
                 <p className="text-sm text-base-muted">
-                  מוחק לצמיתות את כל הידיים, הטווחים, הסשנים והיריבים השמורים במכשיר הזה. לא ניתן
-                  לבטל פעולה זו — מומלץ לייצא קודם.
+                  מוחק לצמיתות את כל הידיים, הטווחים, הסשנים, היריבים ויומן הבנקרול השמורים
+                  במכשיר הזה. לא ניתן לבטל פעולה זו — מומלץ לייצא קודם.
                 </p>
               </div>
               {!confirmingDelete ? (
@@ -427,6 +478,10 @@ export default function SettingsPage() {
             הידיים, הטווחים, הסשנים ופרופילי היריבים ששמרת מאוחסנים בחשבון שלך בענן (מוגנים
             ונגישים רק לך), כדי שיהיו זמינים מכל מכשיר שבו אתה מחובר. ניתוח AI (כשמופעל) שולח רק
             את תקציר היד הרלוונטי לצורך קבלת הסקירה, ואינו שומר אותו בצד השרת.
+          </p>
+          <p>
+            יומן הבנקרול הוא היוצא מן הכלל: הוא נשמר רק במכשיר ובדפדפן הנוכחיים (לא בענן), ולכן
+            אינו מסונכרן בין מכשירים ולא יופיע אם תתחבר ממכשיר אחר.
           </p>
         </PanelBody>
       </Panel>

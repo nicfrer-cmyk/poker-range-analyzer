@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel";
 import { Badge, equityTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { SkeletonPanelRows } from "@/components/ui/Skeleton";
 import { PlayingCard } from "@/components/cards/PlayingCard";
 import { listHands, type StoredHand } from "@/lib/localHandStore";
 import { weekStats, currentStreak } from "@/lib/leaderboard";
@@ -25,7 +26,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { getTipOfTheDay } from "@/lib/tipOfTheDay";
 import { getTodayCount } from "@/lib/usageTracker";
-import { useMockPlan } from "@/lib/useMockPlan";
+import { usePlan } from "@/lib/usePlan";
 import { track } from "@/lib/analytics";
 
 function greeting(): string {
@@ -47,13 +48,17 @@ const MORE_TOOLS = [
 
 export default function DashboardPage() {
   const [hands, setHands] = useState<StoredHand[]>([]);
+  const [handsLoaded, setHandsLoaded] = useState(false);
   const [progress, setProgress] = useState<TrainingProgress | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [plan] = useMockPlan();
+  const { plan } = usePlan();
 
   useEffect(() => {
-    listHands().then(setHands);
+    listHands().then((h) => {
+      setHands(h);
+      setHandsLoaded(true);
+    });
     setProgress(loadProgress());
   }, []);
 
@@ -201,13 +206,17 @@ export default function DashboardPage() {
       </div>
 
       {!hasData ? (
-        <Panel>
-          <PanelBody className="py-10 text-center">
-            <p className="text-sm text-base-muted">
-              עדיין אין מספיק נתונים כדי לבנות לך פרופיל אישי. נתח 3 ידיים ראשונות כדי להתחיל.
-            </p>
-          </PanelBody>
-        </Panel>
+        handsLoaded ? (
+          <Panel>
+            <PanelBody className="py-10 text-center">
+              <p className="text-sm text-base-muted">
+                עדיין אין מספיק נתונים כדי לבנות לך פרופיל אישי. נתח 3 ידיים ראשונות כדי להתחיל.
+              </p>
+            </PanelBody>
+          </Panel>
+        ) : (
+          <SkeletonPanelRows rows={4} />
+        )
       ) : (
         <>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

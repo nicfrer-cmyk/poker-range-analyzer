@@ -22,7 +22,10 @@ export function CardPicker({
   return (
     <div className={cn("space-y-1.5", className)}>
       {SUITS.map((suit) => (
-        <div key={suit.key} className="flex gap-1.5">
+        // A fixed-width flex row (13 * 32px + gaps) overflows on narrow phones — a
+        // self-shrinking 13-column grid (same technique as RangeMatrix's 13x13 grid) keeps
+        // every rank on screen and tappable instead of getting compressed or clipped.
+        <div key={suit.key} className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 sm:gap-1.5">
           {RANKS.map((rank) => {
             const code = `${rank}${suit.key}`;
             const used = usedCards.has(code);
@@ -33,7 +36,7 @@ export function CardPicker({
                 disabled={used}
                 onClick={() => onPick(code)}
                 className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-md border text-xs font-semibold transition-colors",
+                  "flex aspect-square min-w-0 items-center justify-center rounded-md border text-[10px] font-semibold transition-colors sm:text-xs",
                   used
                     ? "cursor-not-allowed border-base-border/50 bg-base-panel2/40 text-base-muted/30"
                     : "border-base-border bg-base-panel2 hover:border-accent hover:bg-accent/10",

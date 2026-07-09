@@ -27,6 +27,11 @@ function isConfigError(err: unknown): err is Error {
   );
 }
 
+/** Fallback Hebrew message for any Supabase failure that isn't a config error or a normal
+ *  `{error}` result (e.g. a network/timeout blip) — never let a raw English exception reach
+ *  the UI via Next's default error boundary. */
+const UNEXPECTED_ERROR = "אירעה שגיאה בלתי צפויה. נסו שוב בעוד רגע.";
+
 async function getOrigin(): Promise<string> {
   const headerList = await headers();
   const host = headerList.get("x-forwarded-host") ?? headerList.get("host");
@@ -54,7 +59,7 @@ export async function signInWithEmail(
     if (error) return { error: translateAuthError(error.message) };
   } catch (err) {
     if (isConfigError(err)) return { error: err.message };
-    throw err;
+    return { error: UNEXPECTED_ERROR };
   }
 
   redirect(redirectTo);
@@ -66,12 +71,17 @@ export async function signInWithEmail(
  * email before a session is created — in that case there's no session to
  * redirect with yet, so we send them to a "check your email" screen instead
  * of `/dashboard`.
+ *
+ * `next` is a same-origin relative path to land on afterward, same contract as
+ * `signInWithEmail`'s `redirectTo` — validate it before calling (see `safeNextPath`).
  */
 export async function signUpWithEmail(
   email: string,
-  password: string
+  password: string,
+  next: string = "/"
 ): Promise<AuthActionResult> {
   let hasSession = false;
+  const callbackUrl = `${await getOrigin()}/auth/callback${next !== "/" ? `?next=${encodeURIComponent(next)}` : ""}`;
 
   try {
     const supabase = await createClient();
@@ -79,17 +89,21 @@ export async function signUpWithEmail(
       email,
       password,
       options: {
-        emailRedirectTo: `${await getOrigin()}/auth/callback`,
+        emailRedirectTo: callbackUrl,
       },
     });
     if (error) return { error: translateAuthError(error.message) };
     hasSession = Boolean(data.session);
   } catch (err) {
     if (isConfigError(err)) return { error: err.message };
-    throw err;
+    return { error: UNEXPECTED_ERROR };
   }
 
-  redirect(hasSession ? "/" : "/auth/check-email");
+  // With a session already established (email confirmation disabled on this Supabase
+  // project), go straight to `next`. Otherwise the user needs to click the confirmation
+  // email first — `next` travels with them via `callbackUrl` above and is applied by
+  // `/auth/callback` once they do.
+  redirect(hasSession ? next : "/auth/check-email");
 }
 
 /**
@@ -98,23 +112,25 @@ export async function signUpWithEmail(
  * `${origin}/auth/callback` after the provider completes.
  */
 export async function signInWithOAuth(
-  provider: "google" | "apple"
+  provider: "google" | "apple",
+  next: string = "/"
 ): Promise<AuthActionResult> {
   let url: string | null = null;
+  const callbackUrl = `${await getOrigin()}/auth/callback${next !== "/" ? `?next=${encodeURIComponent(next)}` : ""}`;
 
   try {
     const supabase = await createClient();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${await getOrigin()}/auth/callback`,
+        redirectTo: callbackUrl,
       },
     });
     if (error) return { error: translateAuthError(error.message) };
     url = data.url;
   } catch (err) {
     if (isConfigError(err)) return { error: err.message };
-    throw err;
+    return { error: UNEXPECTED_ERROR };
   }
 
   if (!url) return { error: `לא ניתן היה להתחיל התחברות דרך ${provider === "google" ? "גוגל" : "אפל"}.` };
@@ -129,7 +145,7 @@ export async function signOut(): Promise<AuthActionResult> {
     if (error) return { error: translateAuthError(error.message) };
   } catch (err) {
     if (isConfigError(err)) return { error: err.message };
-    throw err;
+    return { error: UNEXPECTED_ERROR };
   }
 
   redirect("/");
@@ -152,7 +168,7 @@ export async function requestPasswordReset(email: string): Promise<AuthActionRes
     });
   } catch (err) {
     if (isConfigError(err)) return { error: err.message };
-    throw err;
+    return { error: UNEXPECTED_ERROR };
   }
 
   return { error: null };
@@ -170,7 +186,7 @@ export async function updatePassword(password: string): Promise<AuthActionResult
     if (error) return { error: translateAuthError(error.message) };
   } catch (err) {
     if (isConfigError(err)) return { error: err.message };
-    throw err;
+    return { error: UNEXPECTED_ERROR };
   }
 
   redirect(`/login?message=${encodeURIComponent("הסיסמה עודכנה בהצלחה. אפשר להתחבר עכשיו.")}`);

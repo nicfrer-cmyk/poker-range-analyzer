@@ -13,8 +13,8 @@ import {
   getNotificationSettings,
   type AppNotification,
 } from "@/lib/notifications";
-import { pushNewNotifications } from "@/lib/notificationsPush";
-import { useMockPlan } from "@/lib/useMockPlan";
+import { checkAndPushNotifications } from "@/lib/notificationsPush";
+import { usePlan } from "@/lib/usePlan";
 import { getTodayCount } from "@/lib/usageTracker";
 import { track } from "@/lib/analytics";
 
@@ -33,29 +33,48 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
-  const [plan] = useMockPlan();
+  const { plan } = usePlan();
 
-  // Recompute fresh from local data on mount — no push notifications, no stored event log.
+  // Recompute fresh from local data — no stored event log, always derived live.
   useEffect(() => {
     let cancelled = false;
-    listHands().then((hands) => {
-      if (cancelled) return;
-      const settings = getNotificationSettings();
-      const items = visibleNotifications(
-        computeNotifications(hands, {
-          plan,
-          todayAnalysisCount: getTodayCount("analysis"),
-          ...settings,
-        })
-      );
-      setNotifications(items);
-      setUnreadCount(unreadNotifications(items).length);
+
+    const refresh = () => {
+      listHands().then((hands) => {
+        if (cancelled) return;
+        const settings = getNotificationSettings();
+        const items = visibleNotifications(
+          computeNotifications(hands, {
+            plan,
+            todayAnalysisCount: getTodayCount("analysis"),
+            ...settings,
+          })
+        );
+        setNotifications(items);
+        setUnreadCount(unreadNotifications(items).length);
+      });
       // Real device popup for anything not yet pushed — a no-op unless the user granted OS
       // notification permission from Settings. Independent of read/dismissed state in the bell.
-      pushNewNotifications(items);
-    });
+      checkAndPushNotifications(plan);
+    };
+
+    refresh();
+
+    // A mount-only check misses everything that becomes true later in a long-lived tab (a new
+    // streak milestone, the free-tier usage nudge, a leak found from a hand saved minutes ago).
+    // Re-check periodically and whenever the tab regains focus/visibility, not just once.
+    const intervalId = window.setInterval(refresh, 5 * 60 * 1000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
     };
   }, [plan]);
 

@@ -10,6 +10,11 @@ function safeNextPath(next: string | undefined): string {
   if (!next.startsWith("/")) return "/";
   if (next.startsWith("//")) return "/"; // protocol-relative URL guard
   if (next.includes("://")) return "/";
+  // A leading "/\" (or any backslash) is normalized to a forward slash by browsers' URL
+  // parser, turning "/\evil.com" into a scheme-relative "//evil.com" redirect target after
+  // this passes the checks above — reject backslashes outright rather than trying to keep
+  // enumerating lookalike bypasses.
+  if (next.includes("\\")) return "/";
   return next;
 }
 
@@ -35,9 +40,10 @@ export default async function LoginPage(
     }
   }
 
-  async function googleAction() {
+  async function googleAction(formData: FormData) {
     "use server";
-    await signInWithOAuth("google");
+    const next = safeNextPath(String(formData.get("next") ?? ""));
+    await signInWithOAuth("google", next);
   }
 
   const next = safeNextPath(searchParams.next);
@@ -76,20 +82,13 @@ export default async function LoginPage(
               placeholder="סיסמה"
               className="w-full rounded-lg border border-base-border bg-base-panel2 px-3 py-2 text-sm outline-none focus:border-accent"
             />
-            <div className="flex items-center justify-between text-xs">
-              <label className="flex items-center gap-1.5 text-base-muted">
-                {/* Supabase JS (@supabase/ssr 0.4.0, the version installed here) always persists
-                    the session and always writes a 1-year session cookie regardless of what
-                    `auth.persistSession` / `cookieOptions.maxAge` is passed at sign-in time —
-                    both are hardcoded internally (see createBrowserClient.js / cookies.js).
-                    There is no version-correct way to make an individual sign-in session-only
-                    without hand-rolling a custom cookie storage adapter, which is a bigger
-                    change than Phase 1 warrants. This checkbox is left default-checked and
-                    currently does not change behavior either way — revisit if/when the
-                    @supabase/ssr version changes. */}
-                <input type="checkbox" name="rememberMe" defaultChecked className="h-3.5 w-3.5" />
-                זכור אותי
-              </label>
+            <div className="flex items-center justify-end text-xs">
+              {/* No "remember me" control here on purpose: Supabase JS (@supabase/ssr 0.4.0,
+                  the version installed here) always persists the session and always writes a
+                  1-year session cookie regardless of any `persistSession`/`maxAge` option —
+                  both are hardcoded internally. A checkbox that can't actually change that
+                  behavior would just mislead users into thinking unchecking it logs them out
+                  on browser close. Revisit if/when the @supabase/ssr version changes. */}
               <Link href="/forgot-password" className="text-accent-soft">
                 שכחתי סיסמה
               </Link>
@@ -99,13 +98,17 @@ export default async function LoginPage(
             </Button>
           </form>
           <form action={googleAction}>
+            <input type="hidden" name="next" value={next} />
             <Button type="submit" variant="secondary" className="w-full">
               המשך עם גוגל
             </Button>
           </form>
           <p className="text-center text-xs text-base-muted">
             אין לך חשבון?{" "}
-            <Link href="/signup" className="text-accent-soft">
+            <Link
+              href={next !== "/" ? `/signup?next=${encodeURIComponent(next)}` : "/signup"}
+              className="text-accent-soft"
+            >
               הרשמה
             </Link>
           </p>

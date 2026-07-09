@@ -8,7 +8,7 @@ import {
   type NotificationSettings,
 } from "@/lib/notifications";
 
-/** Same read-on-mount / write-through pattern as useTheme.ts and useMockPlan.ts. */
+/** Same read-on-mount / write-through pattern as useTheme.ts. */
 export function useNotificationSettings(): [NotificationSettings, (s: NotificationSettings) => void] {
   const [settings, setSettingsState] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
 

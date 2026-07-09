@@ -5,12 +5,25 @@ import { Panel, PanelBody } from "@/components/ui/Panel";
 import { PasswordField } from "@/components/auth/PasswordField";
 import { track } from "@/lib/analytics";
 
+/** Same guard as login/page.tsx's safeNextPath — only ever follow a same-origin relative
+ *  path from `?next=`, never an absolute/external URL. */
+function safeNextPath(next: string | undefined): string {
+  if (!next) return "/";
+  if (!next.startsWith("/")) return "/";
+  if (next.startsWith("//")) return "/";
+  if (next.includes("://")) return "/";
+  if (next.includes("\\")) return "/";
+  return next;
+}
+
 export default async function SignupPage(
   props: {
-    searchParams: Promise<{ error?: string }>;
+    searchParams: Promise<{ error?: string; next?: string }>;
   }
 ) {
   const searchParams = await props.searchParams;
+  const next = safeNextPath(searchParams.next);
+
   async function action(formData: FormData) {
     "use server";
     // Fires once per real submit attempt (this only runs on an actual form POST, never on
@@ -20,20 +33,26 @@ export default async function SignupPage(
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
     const consent = formData.get("consent");
+    const formNext = safeNextPath(String(formData.get("next") ?? ""));
     if (!consent) {
       const { redirect } = await import("next/navigation");
-      redirect(`/signup?error=${encodeURIComponent("יש לאשר את תנאי השימוש ומדיניות הפרטיות.")}`);
+      const params = new URLSearchParams({ error: "יש לאשר את תנאי השימוש ומדיניות הפרטיות." });
+      if (formNext !== "/") params.set("next", formNext);
+      redirect(`/signup?${params.toString()}`);
     }
-    const result = await signUpWithEmail(email, password);
+    const result = await signUpWithEmail(email, password, formNext);
     if (result.error) {
       const { redirect } = await import("next/navigation");
-      redirect(`/signup?error=${encodeURIComponent(result.error)}`);
+      const params = new URLSearchParams({ error: result.error });
+      if (formNext !== "/") params.set("next", formNext);
+      redirect(`/signup?${params.toString()}`);
     }
   }
 
-  async function googleAction() {
+  async function googleAction(formData: FormData) {
     "use server";
-    await signInWithOAuth("google");
+    const formNext = safeNextPath(String(formData.get("next") ?? ""));
+    await signInWithOAuth("google", formNext);
   }
 
   return (
@@ -53,6 +72,7 @@ export default async function SignupPage(
             </p>
           )}
           <form action={action} className="space-y-3">
+            <input type="hidden" name="next" value={next} />
             <input
               name="email"
               type="email"
@@ -70,13 +90,17 @@ export default async function SignupPage(
             </Button>
           </form>
           <form action={googleAction}>
+            <input type="hidden" name="next" value={next} />
             <Button type="submit" variant="secondary" className="w-full">
               המשך עם גוגל
             </Button>
           </form>
           <p className="text-center text-xs text-base-muted">
             כבר יש לך חשבון?{" "}
-            <Link href="/login" className="text-accent-soft">
+            <Link
+              href={next !== "/" ? `/login?next=${encodeURIComponent(next)}` : "/login"}
+              className="text-accent-soft"
+            >
               התחברות
             </Link>
           </p>

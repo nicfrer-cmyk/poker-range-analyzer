@@ -16,7 +16,7 @@ import {
   type StoredOpponent,
 } from "@/lib/localOpponentStore";
 import { listHands, updateHand, type StoredHand } from "@/lib/localHandStore";
-import { useMockPlan } from "@/lib/useMockPlan";
+import { usePlan } from "@/lib/usePlan";
 import { canPerformAction } from "@/lib/plan";
 import { track } from "@/lib/analytics";
 
@@ -26,7 +26,7 @@ export default function OpponentsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingOpponent, setEditingOpponent] = useState<StoredOpponent | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [plan] = useMockPlan();
+  const { plan } = usePlan();
   const [gateMessage, setGateMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 

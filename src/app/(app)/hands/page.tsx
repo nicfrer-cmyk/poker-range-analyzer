@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Panel, PanelBody } from "@/components/ui/Panel";
+import { SkeletonPanelRows } from "@/components/ui/Skeleton";
 import { Badge, equityTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { PlayingCard } from "@/components/cards/PlayingCard";
@@ -21,7 +22,7 @@ import {
 } from "@/lib/localHandStore";
 import { MADE_TIER_LABEL } from "@/lib/labels";
 import type { StatusTone } from "@/lib/statusTone";
-import { useMockPlan } from "@/lib/useMockPlan";
+import { usePlan } from "@/lib/usePlan";
 import { canPerformAction } from "@/lib/plan";
 import { track } from "@/lib/analytics";
 
@@ -66,6 +67,7 @@ type HandCategoryFilter = "all" | keyof typeof MADE_TIER_LABEL;
 
 export default function HandsLibraryPage() {
   const [hands, setHands] = useState<StoredHand[]>([]);
+  const [handsLoaded, setHandsLoaded] = useState(false);
   const [query, setQuery] = useState("");
   const [tagFilter, setTagFilter] = useState<TagFilter>("all");
   const [streetFilter, setStreetFilter] = useState<StreetFilter>("all");
@@ -81,12 +83,15 @@ export default function HandsLibraryPage() {
   const [compareMode, setCompareMode] = useState(false);
   const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
   const [comparing, setComparing] = useState(false);
-  const [plan] = useMockPlan();
+  const { plan } = usePlan();
   const [gateMessage, setGateMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    listHands().then(setHands);
+    listHands().then((h) => {
+      setHands(h);
+      setHandsLoaded(true);
+    });
   }, []);
 
   const filtered = useMemo(() => {
@@ -418,13 +423,17 @@ export default function HandsLibraryPage() {
       </Panel>
 
       {filtered.length === 0 ? (
-        <Panel>
-          <PanelBody className="py-12 text-center text-sm text-base-muted">
-            {hands.length === 0
-              ? 'עדיין אין ידיים שמורות. נתח יד ולחץ על "שמור יד" כדי להתחיל לבנות את הספרייה שלך.'
-              : "אין ידיים שתואמות את הסינון הנוכחי."}
-          </PanelBody>
-        </Panel>
+        !handsLoaded ? (
+          <SkeletonPanelRows rows={4} />
+        ) : (
+          <Panel>
+            <PanelBody className="py-12 text-center text-sm text-base-muted">
+              {hands.length === 0
+                ? 'עדיין אין ידיים שמורות. נתח יד ולחץ על "שמור יד" כדי להתחיל לבנות את הספרייה שלך.'
+                : "אין ידיים שתואמות את הסינון הנוכחי."}
+            </PanelBody>
+          </Panel>
+        )
       ) : (
         <div className="space-y-3">
           {filtered.map((h) => {

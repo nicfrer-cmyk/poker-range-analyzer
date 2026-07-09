@@ -35,6 +35,7 @@ export type AnalyticsEvent =
   | "tag_added"
   | "notification_opened"
   | "screenshot_parsed"
+  | "screenshot_review_confirmed"
   | "paywall_viewed"
   | "upgrade_clicked"
   | "subscription_started"
@@ -44,7 +45,7 @@ const SESSION_ID_KEY = "pra:analyticsSessionId";
 
 /**
  * Anonymous, per-browser id — generated once and reused via `localStorage` (same pattern as
- * `pra:mockPlan` in `useMockPlan.ts` / `pra:theme` in `useTheme.ts`), so events fired from the
+ * `pra:theme` in `useTheme.ts`), so events fired from the
  * same browser can be grouped together without any real user identity attached. Browser-only:
  * returns `undefined` for events fired from the server (e.g. `subscription_started`, tracked
  * from the `billing/page.tsx` Server Action) — there's no equivalent durable anonymous id to use

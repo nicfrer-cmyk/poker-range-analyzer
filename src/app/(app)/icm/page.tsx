@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { PaywallModal } from "@/components/billing/PaywallModal";
 import { calculateIcmEquity, icmEquityForStack } from "@/lib/engine/icm";
-import { useMockPlan } from "@/lib/useMockPlan";
+import { usePlan } from "@/lib/usePlan";
 import { canPerformAction } from "@/lib/plan";
 import type { StatusTone } from "@/lib/statusTone";
 
@@ -92,7 +92,7 @@ function icmExplanation(rows: ResultRow[]): string {
 }
 
 export default function IcmPage() {
-  const [plan] = useMockPlan();
+  const { plan } = usePlan();
   const [paywallOpen, setPaywallOpen] = useState(false);
 
   const [players, setPlayers] = useState<PlayerRow[]>(defaultPlayers);

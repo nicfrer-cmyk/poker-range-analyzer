@@ -17,7 +17,7 @@ import {
   type AppNotification,
   type NotificationKind,
 } from "@/lib/notifications";
-import { useMockPlan } from "@/lib/useMockPlan";
+import { usePlan } from "@/lib/usePlan";
 import { getTodayCount } from "@/lib/usageTracker";
 import { track } from "@/lib/analytics";
 
@@ -38,7 +38,7 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
-  const [plan] = useMockPlan();
+  const { plan } = usePlan();
 
   const refresh = async () => {
     const settings = getNotificationSettings();

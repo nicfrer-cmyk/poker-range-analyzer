@@ -30,7 +30,7 @@ import { parseRange, removeConflicts } from "@/lib/engine/range";
 import type { Card, Combo } from "@/lib/engine/types";
 import type { AnalysisResult, NextCardOutlook } from "@/lib/analysisTypes";
 import { saveHand, listHands } from "@/lib/localHandStore";
-import { useMockPlan } from "@/lib/useMockPlan";
+import { usePlan } from "@/lib/usePlan";
 import { canPerformAction, isNearLimit } from "@/lib/plan";
 import { getTodayCount, incrementToday } from "@/lib/usageTracker";
 import { track } from "@/lib/analytics";
@@ -66,7 +66,7 @@ function AnalyzePageInner() {
   const [computing, setComputing] = useState(false);
   const [showDeep, setShowDeep] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [plan] = useMockPlan();
+  const { plan } = usePlan();
   const [gateMessage, setGateMessage] = useState<string | null>(null);
   const [nextCardOutlook, setNextCardOutlook] = useState<{
     best: NextCardOutlook[];
@@ -239,7 +239,7 @@ function AnalyzePageInner() {
       {mode !== "choice" && (
         <div className="flex justify-start">
           <Button variant="ghost" onClick={() => setMode("choice")}>
-            ← חזרה לבחירת סוג ניתוח
+            → חזרה לבחירת סוג ניתוח
           </Button>
         </div>
       )}
@@ -283,7 +283,7 @@ function AnalyzePageInner() {
             <div className="space-y-6">
               <div className="flex justify-start">
                 <Button variant="ghost" onClick={() => setStep(4)}>
-                  ← חזרה לעריכה
+                  → חזרה לעריכה
                 </Button>
               </div>
 

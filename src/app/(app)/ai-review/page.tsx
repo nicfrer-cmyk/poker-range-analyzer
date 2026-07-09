@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { PaywallModal } from "@/components/billing/PaywallModal";
 import { listHands, type StoredHand } from "@/lib/localHandStore";
 import { buildHandSummary } from "@/lib/handSummary";
-import { useMockPlan } from "@/lib/useMockPlan";
+import { usePlan } from "@/lib/usePlan";
 import { canPerformAction } from "@/lib/plan";
 import { getTodayCount, incrementToday } from "@/lib/usageTracker";
 import { fileToBase64 } from "@/lib/utils/file";
@@ -48,6 +48,7 @@ function ReviewText({ text }: { text: string }) {
 
 export default function AiReviewPage() {
   const [hands, setHands] = useState<StoredHand[]>([]);
+  const [handsLoaded, setHandsLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState<string>("");
   const [pastedText, setPastedText] = useState("");
   const [mode, setMode] = useState<"image" | "saved" | "paste">("image");
@@ -57,11 +58,14 @@ export default function AiReviewPage() {
   const [review, setReview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paywallOpen, setPaywallOpen] = useState(false);
-  const [plan] = useMockPlan();
+  const { plan } = usePlan();
   const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    listHands().then(setHands);
+    listHands().then((h) => {
+      setHands(h);
+      setHandsLoaded(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -225,7 +229,9 @@ export default function AiReviewPage() {
           )}
 
           {mode === "saved" &&
-            (hands.length === 0 ? (
+            (!handsLoaded ? (
+              <p className="text-sm text-base-muted">טוען ידיים שמורות…</p>
+            ) : hands.length === 0 ? (
               <p className="text-sm text-base-muted">אין עדיין ידיים שמורות לניתוח.</p>
             ) : (
               <select

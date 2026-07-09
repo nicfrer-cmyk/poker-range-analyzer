@@ -18,7 +18,7 @@ import type { Card, Combo } from "@/lib/engine/types";
 import type { AnalysisResult } from "@/lib/analysisTypes";
 import { saveHand, listHands } from "@/lib/localHandStore";
 import { canPerformAction, isNearLimit } from "@/lib/plan";
-import { useMockPlan } from "@/lib/useMockPlan";
+import { usePlan } from "@/lib/usePlan";
 import { getTodayCount, incrementToday } from "@/lib/usageTracker";
 import { track } from "@/lib/analytics";
 
@@ -44,7 +44,7 @@ export function QuickAnalysis({ onContinueToAdvanced }: { onContinueToAdvanced: 
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [plan] = useMockPlan();
+  const { plan } = usePlan();
   const [paywallMessage, setPaywallMessage] = useState<string | null>(null);
   const countedHandKey = useRef<string | null>(null);
 

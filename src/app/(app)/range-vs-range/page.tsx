@@ -19,7 +19,7 @@ import { RangeBuilder } from "@/components/range/RangeBuilder";
 import { CardPicker } from "@/components/cards/CardPicker";
 import { PlayingCard } from "@/components/cards/PlayingCard";
 import { EquityMeter } from "@/components/analysis/EquityMeter";
-import { useMockPlan } from "@/lib/useMockPlan";
+import { usePlan } from "@/lib/usePlan";
 import { canPerformAction } from "@/lib/plan";
 import { useTheme } from "@/lib/useTheme";
 import type { StatusTone } from "@/lib/statusTone";
@@ -131,7 +131,7 @@ function rangeVsRangeExplanation(
 type BoardSlots = [string | undefined, string | undefined, string | undefined, string | undefined, string | undefined];
 
 export default function RangeVsRangePage() {
-  const [plan] = useMockPlan();
+  const { plan } = usePlan();
   const [theme] = useTheme();
   const [paywallOpen, setPaywallOpen] = useState(false);
 

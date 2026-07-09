@@ -219,7 +219,7 @@ export function Step1GameType() {
                     type="button"
                     onClick={() => removeSavedSpot(spot.id)}
                     aria-label={`מחק את הספוט ${spot.label}`}
-                    className="flex h-4 w-4 items-center justify-center rounded-full text-base-muted hover:bg-base-border hover:text-base-text"
+                    className="flex h-5 w-5 items-center justify-center rounded-full text-sm text-base-muted hover:bg-base-border hover:text-base-text"
                   >
                     ×
                   </button>

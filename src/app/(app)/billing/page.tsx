@@ -202,8 +202,8 @@ export default async function BillingPage(
             <li>מצב אימון בסיסי</li>
             <li>השוואת ידיים, שיתוף, תגיות וחיפוש בספריית הידיים</li>
             <li>סיור היכרות והתראות באפליקציה</li>
-            <li className="text-base-muted">טווח מול טווח — בקרוב, טרם הושק</li>
-            <li className="text-base-muted">מחשבון ICM — בקרוב, טרם הושק</li>
+            <li className="text-base-muted">טווח מול טווח — תכונת פרו</li>
+            <li className="text-base-muted">מחשבון ICM — תכונת פרו</li>
             <li>{PLAN_LIMITS.FREE.dailyAiReviewLimit} ניתוחי AI ליד ביום</li>
             <li>עד {PLAN_LIMITS.FREE.maxOpponentProfiles} פרופילי יריבים</li>
             <li className="text-base-muted">ייצוא נתונים — לא כלול</li>
@@ -234,8 +234,8 @@ export default async function BillingPage(
             </li>
             <li>מצב אימון מלא ומסלולי לימוד</li>
             <li>צפייה חוזרת ביד, השוואת ידיים, שיתוף, תגיות וחיפוש מתקדם</li>
-            <li className="text-base-muted">טווח מול טווח — בקרוב, טרם הושק (ללא תלות בתוכנית)</li>
-            <li className="text-base-muted">מחשבון ICM — בקרוב, טרם הושק (ללא תלות בתוכנית)</li>
+            <li>טווח מול טווח</li>
+            <li>מחשבון ICM</li>
             <li>ניתוחי AI ליד ללא הגבלה</li>
             <li>פרופילי יריבים ללא הגבלה</li>
             <li>ייצוא נתונים</li>

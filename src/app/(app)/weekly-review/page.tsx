@@ -12,7 +12,7 @@ import { formatLeakKey, LEAK_DIMENSION_LABEL } from "@/lib/labels";
 import { loadProgress, type TrainingProgress } from "@/lib/training";
 import { computeSkillTree } from "@/lib/coach/skillTree";
 import { computePokerIQ, getIqHistory, getWeeklyDelta } from "@/lib/coach/iq";
-import { useMockPlan } from "@/lib/useMockPlan";
+import { usePlan } from "@/lib/usePlan";
 import { canPerformAction } from "@/lib/plan";
 
 const PAYWALL_TITLE = "פתח את המאמן האישי המלא שלך";
@@ -22,7 +22,7 @@ const PAYWALL_BODY =
 export default function WeeklyReviewPage() {
   const [hands, setHands] = useState<StoredHand[]>([]);
   const [progress, setProgress] = useState<TrainingProgress | null>(null);
-  const [plan] = useMockPlan();
+  const { plan } = usePlan();
   const [paywallOpen, setPaywallOpen] = useState(false);
 
   useEffect(() => {

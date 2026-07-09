@@ -12,6 +12,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel";
+import { SkeletonPanelRows } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { Badge, equityTone } from "@/components/ui/Badge";
 import { PaywallModal } from "@/components/billing/PaywallModal";
@@ -20,7 +21,7 @@ import { computeSessionStats, topLeaks, leaksByStreet, type TopLeak, type Decisi
 import { formatLeakKey, LEAK_DIMENSION_LABEL, STREET_LABEL } from "@/lib/labels";
 import { trendFor, type TrendDirection } from "@/lib/coach/weeklyReview";
 import { useTheme } from "@/lib/useTheme";
-import { useMockPlan } from "@/lib/useMockPlan";
+import { usePlan } from "@/lib/usePlan";
 import { canPerformAction } from "@/lib/plan";
 import { cn } from "@/lib/utils/cn";
 import type { StatusTone } from "@/lib/statusTone";
@@ -92,11 +93,15 @@ export default function LeaksPage() {
   const [theme] = useTheme();
   const chartColors = CHART_COLORS[theme];
   const [hands, setHands] = useState<StoredHand[]>([]);
-  const [plan] = useMockPlan();
+  const [handsLoaded, setHandsLoaded] = useState(false);
+  const { plan } = usePlan();
   const [paywallOpen, setPaywallOpen] = useState(false);
 
   useEffect(() => {
-    listHands().then(setHands);
+    listHands().then((h) => {
+      setHands(h);
+      setHandsLoaded(true);
+    });
   }, []);
 
   const stats = useMemo(() => computeSessionStats(hands), [hands]);
@@ -108,11 +113,15 @@ export default function LeaksPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold">גילוי דליפות</h1>
-        <Panel>
-          <PanelBody className="py-12 text-center text-sm text-base-muted">
-            עדיין אין ידיים שמורות. שמור כמה ידיים מנותחות כדי לפתוח את גילוי הדליפות.
-          </PanelBody>
-        </Panel>
+        {!handsLoaded ? (
+          <SkeletonPanelRows rows={4} />
+        ) : (
+          <Panel>
+            <PanelBody className="py-12 text-center text-sm text-base-muted">
+              עדיין אין ידיים שמורות. שמור כמה ידיים מנותחות כדי לפתוח את גילוי הדליפות.
+            </PanelBody>
+          </Panel>
+        )}
       </div>
     );
   }

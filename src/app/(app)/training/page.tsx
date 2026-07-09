@@ -198,7 +198,7 @@ function TrainingPageInner() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" onClick={handleBackToTracks}>
-                ← בחירת נושא
+                → בחירת נושא
               </Button>
               <Badge tone="neutral">{getTrack(trackId).shortLabel}</Badge>
             </div>

@@ -6,14 +6,16 @@ import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { PlayingCard } from "@/components/cards/PlayingCard";
+import { CardPicker } from "@/components/cards/CardPicker";
 import type { ActionTaken } from "@/lib/engine/leakFinder";
+import type { Card } from "@/lib/engine/types";
 import { parseBulkHandHistories, type ParsedHand } from "@/lib/engine/handHistoryParser";
 import { parsedHandToBoard, parsedHandToAnalysisInput } from "@/lib/importAdapter";
 import { useAnalysisStore, type AnalysisInput } from "@/lib/store/analysisStore";
 import { runAnalysis } from "@/lib/analysisEngine";
 import { saveHand } from "@/lib/localHandStore";
 import { createSession } from "@/lib/localSessionStore";
-import { useMockPlan } from "@/lib/useMockPlan";
+import { usePlan } from "@/lib/usePlan";
 import { canPerformAction, isNearLimit } from "@/lib/plan";
 import { getTodayCount, incrementToday } from "@/lib/usageTracker";
 import { fileToBase64 } from "@/lib/utils/file";
@@ -79,14 +81,48 @@ interface ScreenshotParseResult {
   error?: string;
 }
 
+const POSITION_OPTIONS = ["UTG", "UTG+1", "MP", "MP+1", "HJ", "CO", "BTN", "SB", "BB"];
+
+/** Editable draft the AI's screenshot reading gets loaded into — nothing from here reaches the
+ *  parsed-hands list (and therefore the analyzer) until the user explicitly reviews and confirms
+ *  it via "אישור והמשך לניתוח". Every field the model didn't return starts out null/empty and is
+ *  shown as "לא זוהה", never guessed. */
+interface ScreenshotDraft {
+  heroCards: [string | null, string | null];
+  board: (string | null)[];
+  potSize: string;
+  heroPosition: string;
+}
+
+type ScreenshotPickerTarget = { kind: "hero"; index: 0 | 1 } | { kind: "board"; index: number };
+
+function draftFromParseResult(data: ScreenshotParseResult): ScreenshotDraft {
+  return {
+    heroCards: [data.heroCards?.[0] ?? null, data.heroCards?.[1] ?? null],
+    board: [
+      data.board?.flop?.[0] ?? null,
+      data.board?.flop?.[1] ?? null,
+      data.board?.flop?.[2] ?? null,
+      data.board?.turn ?? null,
+      data.board?.river ?? null,
+    ],
+    potSize: data.potSize !== undefined ? String(data.potSize) : "",
+    heroPosition: data.heroPosition ?? "",
+  };
+}
+
 export function HandHistoryImporter() {
   const router = useRouter();
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState<ParsedHand[]>([]);
-  const [showScreenshotStub, setShowScreenshotStub] = useState(false);
+  const [showScreenshotPanel, setShowScreenshotPanel] = useState(false);
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const [screenshotError, setScreenshotError] = useState<string | null>(null);
-  const [plan] = useMockPlan();
+  const [postGameConfirmed, setPostGameConfirmed] = useState(false);
+  const [screenshotPreviewUrl, setScreenshotPreviewUrl] = useState<string | null>(null);
+  const [screenshotDraft, setScreenshotDraft] = useState<ScreenshotDraft | null>(null);
+  const [screenshotPicker, setScreenshotPicker] = useState<ScreenshotPickerTarget | null>(null);
+  const { plan } = usePlan();
   const [gateMessage, setGateMessage] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState(defaultSessionName());
   const [sessionSavedMessage, setSessionSavedMessage] = useState<string | null>(null);
@@ -96,7 +132,7 @@ export function HandHistoryImporter() {
 
   const handleScreenshot = async (files: FileList | null) => {
     const file = files?.[0];
-    if (!file) return;
+    if (!file || !postGameConfirmed) return;
 
     const gate = canPerformAction(plan, "runAiReview", getTodayCount("ai-review"));
     if (!gate.allowed) {
@@ -104,6 +140,9 @@ export function HandHistoryImporter() {
       return;
     }
 
+    if (screenshotPreviewUrl) URL.revokeObjectURL(screenshotPreviewUrl);
+    setScreenshotPreviewUrl(URL.createObjectURL(file));
+    setScreenshotDraft(null);
     setScreenshotError(null);
     setScreenshotLoading(true);
     try {
@@ -118,32 +157,78 @@ export function HandHistoryImporter() {
         setScreenshotError(data.error ?? "ניתוח התמונה נכשל.");
         return;
       }
-      if (!data.heroCards && !data.board && data.potSize === undefined) {
-        setScreenshotError("לא זוהה מידע ברור בתמונה. אפשר לנסות תמונה ברורה יותר, או להדביק טקסט.");
-        return;
-      }
-
       incrementToday("ai-review");
       track("screenshot_parsed", { hasHeroCards: Boolean(data.heroCards) });
-      setParsed((prev) => [
-        {
-          format: "unknown",
-          seats: [],
-          heroCards: data.heroCards as ParsedHand["heroCards"],
-          heroPosition: data.heroPosition,
-          board: (data.board ?? {}) as ParsedHand["board"],
-          actions: [],
-          potSize: data.potSize,
-          raw: "",
-        },
-        ...prev,
-      ]);
-      setShowScreenshotStub(false);
+      // Always drop into the review/edit draft below — even a fully-empty result — so the user
+      // can fill in anything the AI missed by hand rather than getting a dead end. Nothing here
+      // reaches the parsed-hands list (and therefore the analyzer) until they explicitly confirm.
+      setScreenshotDraft(draftFromParseResult(data));
+      if (!data.heroCards && !data.board && data.potSize === undefined) {
+        setScreenshotError("לא זוהה מידע אוטומטית בתמונה — אפשר להזין את הפרטים ידנית למטה.");
+      }
     } catch {
       setScreenshotError("שגיאת רשת בניתוח התמונה.");
     } finally {
       setScreenshotLoading(false);
     }
+  };
+
+  const setDraftHeroCard = (index: 0 | 1, card: string | null) => {
+    setScreenshotDraft((prev) => {
+      if (!prev) return prev;
+      const heroCards: [string | null, string | null] = [...prev.heroCards];
+      heroCards[index] = card;
+      return { ...prev, heroCards };
+    });
+  };
+
+  const setDraftBoardCard = (index: number, card: string | null) => {
+    setScreenshotDraft((prev) => {
+      if (!prev) return prev;
+      const board = [...prev.board];
+      board[index] = card;
+      return { ...prev, board };
+    });
+  };
+
+  const draftUsedCards = (): Set<string> =>
+    new Set([...(screenshotDraft?.heroCards ?? []), ...(screenshotDraft?.board ?? [])].filter(
+      (c): c is string => Boolean(c)
+    ));
+
+  const cancelScreenshotReview = () => {
+    if (screenshotPreviewUrl) URL.revokeObjectURL(screenshotPreviewUrl);
+    setScreenshotPreviewUrl(null);
+    setScreenshotDraft(null);
+    setScreenshotPicker(null);
+    setScreenshotError(null);
+  };
+
+  const confirmScreenshotDraft = () => {
+    if (!screenshotDraft) return;
+    const board: ParsedHand["board"] = {};
+    const flop = screenshotDraft.board.slice(0, 3).filter(Boolean) as Card[];
+    if (flop.length > 0) board.flop = flop;
+    if (screenshotDraft.board[3]) board.turn = screenshotDraft.board[3] as Card;
+    if (screenshotDraft.board[4]) board.river = screenshotDraft.board[4] as Card;
+
+    setParsed((prev) => [
+      {
+        format: "unknown",
+        seats: [],
+        heroCards: screenshotDraft.heroCards.filter(Boolean) as ParsedHand["heroCards"],
+        heroPosition: screenshotDraft.heroPosition || undefined,
+        board,
+        actions: [],
+        potSize: screenshotDraft.potSize ? Number(screenshotDraft.potSize) : undefined,
+        raw: "",
+      },
+      ...prev,
+    ]);
+    track("screenshot_review_confirmed");
+    setShowScreenshotPanel(false);
+    cancelScreenshotReview();
+    setPostGameConfirmed(false);
   };
 
   const handleParse = () => {
@@ -241,7 +326,7 @@ export function HandHistoryImporter() {
       <Panel>
         <PanelHeader>
           <PanelTitle>הדבקת היסטוריית יד</PanelTitle>
-          <Button size="sm" variant="ghost" onClick={() => setShowScreenshotStub(true)}>
+          <Button size="sm" variant="ghost" onClick={() => setShowScreenshotPanel(true)}>
             ניתוח מצילום מסך
           </Button>
         </PanelHeader>
@@ -275,33 +360,194 @@ export function HandHistoryImporter() {
         </PanelBody>
       </Panel>
 
-      {showScreenshotStub && (
+      {showScreenshotPanel && (
         <Panel>
-          <PanelBody className="space-y-3 py-6 text-center">
-            <p className="text-sm text-base-muted">
-              העלה צילום מסך של שולחן הפוקר — Claude ינסה לזהות את קלפי ההירו, הבורד וגודל הפוט
-              אוטומטית. זיהוי אוטומטי, כדאי לבדוק את התוצאה לפני שמירה.
-            </p>
-            <div className="flex items-center justify-center gap-3">
-              <label
-                className={`cursor-pointer rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white ${
-                  screenshotLoading ? "pointer-events-none opacity-60" : ""
-                }`}
-              >
-                {screenshotLoading ? "מנתח…" : "בחירת תמונה"}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/gif,image/webp"
-                  className="hidden"
-                  disabled={screenshotLoading}
-                  onChange={(e) => handleScreenshot(e.target.files)}
-                />
-              </label>
-              <Button size="sm" variant="ghost" onClick={() => setShowScreenshotStub(false)}>
-                סגירה
-              </Button>
+          <PanelHeader>
+            <PanelTitle>ניתוח צילום מסך</PanelTitle>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setShowScreenshotPanel(false);
+                cancelScreenshotReview();
+                setPostGameConfirmed(false);
+              }}
+            >
+              סגירה
+            </Button>
+          </PanelHeader>
+          <PanelBody className="space-y-4">
+            <div className="rounded-lg border border-status-close/40 bg-status-close/10 px-3 py-2 text-xs text-base-text">
+              העלאת צילום מסך מיועדת לניתוח ולמידה לאחר משחק בלבד — לא ככלי סיוע בזמן משחק חי.
             </div>
-            {screenshotError && <p className="text-xs text-status-risky">{screenshotError}</p>}
+
+            {!screenshotDraft && (
+              <>
+                <label className="flex items-start gap-2 text-sm text-base-text">
+                  <input
+                    type="checkbox"
+                    checked={postGameConfirmed}
+                    onChange={(e) => setPostGameConfirmed(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  אני מאשר/ת שהתמונה מיועדת לניתוח לאחר סיום היד, לצורך לימוד בלבד.
+                </label>
+                <div className="text-center">
+                  <label
+                    className={`inline-block cursor-pointer rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white ${
+                      screenshotLoading || !postGameConfirmed ? "pointer-events-none opacity-50" : ""
+                    }`}
+                  >
+                    {screenshotLoading ? "מנתח…" : "בחירת תמונה"}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif,image/webp"
+                      className="hidden"
+                      disabled={screenshotLoading || !postGameConfirmed}
+                      onChange={(e) => handleScreenshot(e.target.files)}
+                    />
+                  </label>
+                  {!postGameConfirmed && (
+                    <p className="mt-2 text-xs text-base-muted">יש לאשר את התיבה למעלה כדי להעלות תמונה.</p>
+                  )}
+                </div>
+                {screenshotError && <p className="text-center text-xs text-status-risky">{screenshotError}</p>}
+              </>
+            )}
+
+            {screenshotDraft && (
+              <div className="space-y-4">
+                <p className="text-xs text-base-muted">
+                  אלה הפרטים שזוהו מהתמונה. בדוק ותקן כל שדה לפני שממשיכים לניתוח — שום דבר לא
+                  נשלח לניתוח בלי אישור.
+                </p>
+                {screenshotError && <p className="text-xs text-status-risky">{screenshotError}</p>}
+
+                <div className="flex flex-wrap items-start gap-4">
+                  {screenshotPreviewUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={screenshotPreviewUrl}
+                      alt="תצוגה מקדימה של צילום המסך שהועלה"
+                      className="h-24 w-auto rounded-lg border border-base-border object-cover"
+                    />
+                  )}
+
+                  <div className="space-y-1">
+                    <p className="text-xs text-base-muted">קלפי ההירו</p>
+                    <div className="flex gap-2">
+                      {[0, 1].map((i) => (
+                        <div key={i} className="flex flex-col items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setScreenshotPicker({ kind: "hero", index: i as 0 | 1 })}
+                          >
+                            <PlayingCard card={screenshotDraft.heroCards[i]} size="md" />
+                          </button>
+                          {!screenshotDraft.heroCards[i] && (
+                            <span className="text-[10px] text-status-risky">לא זוהה</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-xs text-base-muted">הבורד</p>
+                    <div className="flex gap-2">
+                      {[0, 1, 2, 3, 4].map((i) => (
+                        <div key={i} className="flex flex-col items-center gap-1">
+                          <button type="button" onClick={() => setScreenshotPicker({ kind: "board", index: i })}>
+                            <PlayingCard card={screenshotDraft.board[i]} size="md" />
+                          </button>
+                          {!screenshotDraft.board[i] && (
+                            <span className="text-[10px] text-base-muted">
+                              {i < 3 ? "פלופ" : i === 3 ? "טרן" : "ריבר"} — לא זוהה
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {screenshotPicker && (
+                  <div className="rounded-lg border border-base-border bg-base-panel2 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs text-base-muted">
+                        {screenshotPicker.kind === "hero"
+                          ? `בחירת קלף ליד ${screenshotPicker.index + 1}`
+                          : "בחירת קלף לבורד"}
+                      </span>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            if (screenshotPicker.kind === "hero") setDraftHeroCard(screenshotPicker.index, null);
+                            else setDraftBoardCard(screenshotPicker.index, null);
+                            setScreenshotPicker(null);
+                          }}
+                        >
+                          ניקוי
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setScreenshotPicker(null)}>
+                          סגירה
+                        </Button>
+                      </div>
+                    </div>
+                    <CardPicker
+                      usedCards={draftUsedCards()}
+                      onPick={(card) => {
+                        if (screenshotPicker.kind === "hero") setDraftHeroCard(screenshotPicker.index, card);
+                        else setDraftBoardCard(screenshotPicker.index, card);
+                        setScreenshotPicker(null);
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-base-muted">גודל הפוט</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={screenshotDraft.potSize}
+                      onChange={(e) =>
+                        setScreenshotDraft((prev) => (prev ? { ...prev, potSize: e.target.value } : prev))
+                      }
+                      placeholder="לא זוהה"
+                      className="w-28 rounded-lg border border-base-border bg-base-panel2 px-2.5 py-2 text-sm outline-none focus:border-accent"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-base-muted">פוזיציית ההירו</label>
+                    <select
+                      value={screenshotDraft.heroPosition}
+                      onChange={(e) =>
+                        setScreenshotDraft((prev) => (prev ? { ...prev, heroPosition: e.target.value } : prev))
+                      }
+                      className="rounded-lg border border-base-border bg-base-panel2 px-2.5 py-2 text-sm outline-none focus:border-accent"
+                    >
+                      <option value="">לא זוהה</option>
+                      {POSITION_OPTIONS.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button onClick={confirmScreenshotDraft}>אישור והמשך לניתוח</Button>
+                  <Button variant="ghost" onClick={cancelScreenshotReview}>
+                    ביטול
+                  </Button>
+                </div>
+              </div>
+            )}
           </PanelBody>
         </Panel>
       )}

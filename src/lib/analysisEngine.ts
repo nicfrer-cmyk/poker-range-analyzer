@@ -120,16 +120,19 @@ function bucketRangeComposition(
 
 function computeBlockers(
   heroCards: Card[],
-  rawEntries: Array<{ combo: Combo; weight: number }>,
+  boardFilteredEntries: Array<{ combo: Combo; weight: number }>,
   board: Card[]
 ): BlockerInfo[] {
   return heroCards.map((heroCard) => {
-    const heroRank = cardRank(heroCard);
     let value = 0;
     let draw = 0;
     let bluff = 0;
-    for (const { combo } of rawEntries) {
-      if (cardRank(combo.c1) !== heroRank && cardRank(combo.c2) !== heroRank) continue;
+    for (const { combo } of boardFilteredEntries) {
+      // Exact-card match, not rank match: holding one specific Ace only removes the combos
+      // that use *that* Ace (e.g. AhKh), not every combo containing any of the other 3 Aces
+      // (AdKd/AcKc/AsKs are still perfectly live). Matching by rank alone overcounts blocked
+      // combos by up to 4x.
+      if (combo.c1 !== heroCard && combo.c2 !== heroCard) continue;
       const { madeTier, draws } = classifyHand(combo, board);
       if (VALUE_TIERS.has(madeTier)) value += 1;
       else if (draws.length > 0) draw += 1;
@@ -150,8 +153,11 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult | null {
 
   const rawRange = parseRange(input.villainRangeText);
   const villainRange = removeConflicts(rawRange, dead);
-  const rawEntries = rangeEntries(rawRange);
   const entries = rangeEntries(villainRange);
+  // Board-conflict-removed but NOT hero-conflict-removed: blockers need combos that would
+  // otherwise be live (physically possible against the board) so it can measure how many of
+  // them each of hero's specific cards removes.
+  const boardFilteredEntries = rangeEntries(removeConflicts(rawRange, board));
 
   const equity = calculateEquity({ heroCards: combo, villainRange, board, iterations: 6_000 });
   const heroEquityPct = equity.heroEquity * 100;
@@ -184,7 +190,7 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult | null {
       : "SPR גבוה — עמוק ביחס לקופה, שחק בזהירות בלי יד חזקה.";
 
   const rangeComposition = bucketRangeComposition(entries, board);
-  const blockers = computeBlockers(heroCards, rawEntries, board);
+  const blockers = computeBlockers(heroCards, boardFilteredEntries, board);
 
   const keyInsights: Insight[] = [];
   keyInsights.push({

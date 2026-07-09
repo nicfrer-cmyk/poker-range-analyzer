@@ -4,6 +4,72 @@ Source spec: `poker-analyzer-spec.pdf` (Hebrew, v1.0, July 2026). This file trac
 actually built vs. what's still blocked on a real decision or credential — read this before
 assuming something is "done."
 
+## Pre-payment full audit — 2026-07-09
+
+End-to-end audit + hardening pass across the whole app before connecting real billing. By this
+point the app had grown well past this file's earlier "Wave 2+ coming soon" notes — Training, AI
+Review, Range vs Range, ICM, DNA/IQ/Missions/Skills/Roadmap, Opponents, Bankroll, and Leaderboard
+are all fully built and live; check `src/lib/nav.ts` and the real routes under `src/app/(app)/*`
+over older notes in this file. Also: Next.js is now **16.2.10** (middleware.ts renamed to
+`src/proxy.ts` per Next 16 convention).
+
+**Fixed — engine correctness** (zero test coverage existed for made-hand/draw classification
+before this pass; 41 new tests added across `classify.test.ts` and `analysisEngine.test.ts`):
+- `findStraightDraws` misclassified ace-low wheel draws (e.g. A-2-3-4 needing a 5) as
+  open-ended (8 outs) instead of gutshot (4 outs) — rewritten to count distinct completing ranks
+  instead of a single window's missing-card position.
+- `computeBlockers` matched villain combos by card *rank* instead of the exact card, overcounting
+  "combos blocked by this card" up to 4x (holding one Ace counted all 4 suits' worth of
+  Ace-containing combos as blocked). Fixed to exact-card matching + board-only conflict removal.
+- `classifyMadeTier`'s paired-board-no-match case always returned `'air'`, even when hero held
+  two genuine overcards — inconsistent with the unpaired-board case, which does check overcards.
+  Fixed to apply the same check both ways.
+
+**Fixed — security/monetization**: an open-redirect in login's `next=` param (a leading `/\`
+bypassed the same-origin checks — browsers normalize backslash to `//evil.com`). The **critical**
+hole where `useMockPlan()` (a plain `localStorage` toggle, exposed as literal "חינמי/פרו" buttons
+in Settings) was the only plan source for 15 of 16 gated screens — replaced with a real
+`usePlan()` hook backed by new `GET /api/plan`, which reads the same `users.plan` column
+`checkAndIncrementAiQuota` already trusts server-side; the manual override now only exists in
+non-production builds (dead-code-eliminated via `process.env.NODE_ENV`).
+
+**Fixed — notifications**: root-caused the "permission granted but nothing ever pops up" report —
+granting permission in Settings updated React state but never re-ran the compute-and-push cycle;
+the bell's own check had already run once, before permission existed, with no periodic/focus
+recheck. Now grant → immediate check, plus a 5-minute interval and a focus/visibility recheck,
+plus a "שליחת התראת בדיקה" test button. Real Web Push (VAPID, works when the app is fully closed)
+is still not implemented — see open items below.
+
+**Fixed — screenshot analysis**: the importer's "screenshot" flow already called a real Claude
+Vision endpoint (contrary to this file's older "wired-up stub" line below — stale, kept for
+history) but had no preview, no explicit post-game confirmation, and loaded the AI's raw output
+straight into the hand list with no review/edit step. Rebuilt with an image preview, the required
+post-game-only warning + confirm checkbox gating the upload, and a full editable review
+(hero cards/board/pot/position, each labeled "לא זוהה" when the model didn't return it) before
+anything reaches the analyzer.
+
+**Fixed — UX/mobile**: `CardPicker` (the primary card-entry control app-wide) used a fixed-width
+13-button row that could overflow/compress below usable tap size on phones — switched to the same
+self-shrinking grid technique `RangeMatrix` already used correctly. Wizard/training "back" buttons
+used a left-pointing arrow, backwards for this RTL app's own convention. Dashboard/hands/leaks/
+AI-review pages flashed the "no data" empty state before their first Supabase fetch resolved — added
+skeleton loaders. Several smaller fixes: `CardsToWatch` empty state on preflop/river, bankroll data
+missing from Settings' export-all/delete-all, stale "coming soon" copy on `/billing` for ICM/Range
+vs Range (both are actually fully built and Pro-gated already), a non-functional "זכור אותי"
+checkbox removed, raw-English-exception fallback added to every auth Server Action.
+
+**Known non-blocking lint debt**: `eslint-config-next@16` bundles a stricter
+`react-hooks/set-state-in-effect` rule that now flags ~7 files (`useTheme.ts`,
+`useNotificationSettings.ts`, `OnboardingTour.tsx`, `Step1GameType.tsx`, `OpponentFormModal.tsx`,
+`QuickAnalysis.tsx`, `usePlan.ts`) for the mount-effect-reads-localStorage pattern used throughout
+this codebase — confirmed via `git show` that the pattern predates this rule becoming strict, not
+a regression. Deliberately not bulk-converted to `useSyncExternalStore` under audit time
+pressure — spot-checked that a naive conversion of `useNotificationSettings` would actually break
+(`getNotificationSettings()` returns a fresh object every call, which `useSyncExternalStore`'s
+`getSnapshot` must not do). `next build` succeeds regardless; this only shows up in `npm run
+lint`. Also fixed in this pass: `.netlify/` build output wasn't excluded from ESLint's scope,
+producing ~33 unrelated errors from vendored Deno/edge-runtime code.
+
 ## Phase 1 of paid-SaaS roadmap — mandatory auth gate — 2026-07-07
 
 Product decision: registration is now required before using the app at all (no more
