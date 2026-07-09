@@ -1,18 +1,12 @@
 // ---------------------------------------------------------------------------
 // Poker Range Analyzer — Prisma schema
 //
-// LOCAL-ONLY SCAFFOLDING: there is no real Supabase Postgres instance wired
-// up yet. This schema is safe to edit and commit, but it will not do
-// anything until you:
-//   1. Create a Supabase project (or any Postgres instance) and copy its
-//      connection string into DATABASE_URL in your local `.env` (see
-//      `.env.example` at the project root for the placeholder).
-//   2. Run `npx prisma migrate dev --name init` to create the tables.
-//   3. Run `npx prisma generate` to (re)generate the Prisma Client.
-//
-// Do NOT run migrate/generate as part of CI or build steps until a real
-// database is connected — this file is intentionally just a blueprint until
-// then.
+// A real Supabase Postgres instance is connected and migrated (see
+// ROADMAP.md). `prisma generate` runs automatically via the `postinstall`
+// script in package.json, so a fresh `npm install` (e.g. on a CI/deploy
+// server) always produces a Prisma Client matching that environment's
+// platform — don't remove that script, a missing/stale generated client is
+// what broke the first Netlify-hosted (non-local-CLI) build.
 // ---------------------------------------------------------------------------
 
 generator client {
@@ -170,17 +164,29 @@ model Opponent {
 }
 
 model Subscription {
-  id                   String    @id @default(cuid())
-  userId               String    @unique @map("user_id")
-  stripeCustomerId     String    @map("stripe_customer_id")
-  stripeSubscriptionId String?   @map("stripe_subscription_id")
-  plan                 Plan      @default(FREE)
-  status               String
-  currentPeriodEnd     DateTime? @map("current_period_end")
-  createdAt            DateTime  @default(now()) @map("created_at")
-  updatedAt            DateTime  @updatedAt @map("updated_at")
+  id                    String    @id @default(cuid())
+  userId                String    @unique @map("user_id")
+  // "stripe" (legacy scaffolding, not the active provider) or "grow" (active — see
+  // src/app/api/grow/webhook/route.ts). Defaults to "stripe" so existing rows, if any,
+  // keep their prior meaning without a backfill.
+  provider              String    @default("stripe")
+  // Nullable: Grow has no concept of a "customer id" the way Stripe does.
+  stripeCustomerId      String?   @map("stripe_customer_id")
+  stripeSubscriptionId  String?   @map("stripe_subscription_id")
+  // Grow's transaction/deal identifier, when the payload includes one — used to make webhook
+  // processing idempotent (a retried notify call for the same transaction is a no-op).
+  providerTransactionId String?   @map("provider_transaction_id")
+  plan                  Plan      @default(FREE)
+  status                String
+  currentPeriodEnd      DateTime? @map("current_period_end")
+  // Full raw webhook payload, kept for debugging since Grow's exact field-name shape for this
+  // integration is still unconfirmed against a real sandbox account — see webhook route comment.
+  rawPayload            Json?     @map("raw_payload")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
 
-  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([provider, providerTransactionId])
   @@map("subscriptions")
 }

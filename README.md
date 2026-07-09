@@ -31,6 +31,9 @@ is connected (see `.env.example` and `ROADMAP.md`).
 - `npm test` — engine unit tests (Vitest)
 - `npm run lint` — ESLint
 - `npm run prisma:generate` — regenerate the Prisma client after schema changes
+- `node scripts/set-plan.mjs <email-or-userId> <FREE|PRO> --yes` — manual plan override, for use
+  until the Grow webhook is verified against a real sandbox account (see
+  `src/app/api/grow/webhook/route.ts`). Requires `DATABASE_URL` in the environment.
 
 ## Project layout
 

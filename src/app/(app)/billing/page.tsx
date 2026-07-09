@@ -32,6 +32,7 @@ import { prisma } from "@/lib/prisma";
 import { PLAN_LIMITS, type Plan } from "@/lib/plan";
 import { PRO_PRICING_ILS, type BillingInterval } from "@/lib/grow/plans";
 import { track } from "@/lib/analytics";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 async function getOrigin(): Promise<string> {
   const headerList = await headers();
@@ -165,8 +166,12 @@ export default async function BillingPage(
       )}
       {checkoutSuccess && (
         <div className="mb-6 rounded-2xl border border-status-crushing/40 bg-status-crushing/10 p-4 text-sm text-base-text">
-          תודה! המנוי שלך בתהליך הקמה — הדף הזה יציג גישת פרו ברגע ש-Grow
-          יאשר את התשלום.
+          התשלום התקבל! החשבון שלך ישודרג לפרו תוך זמן קצר. אם הגישה לפרו
+          לא מתעדכנת תוך כמה דקות, אפשר לפנות אלינו בכתובת{" "}
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="underline">
+            {SUPPORT_EMAIL}
+          </a>{" "}
+          ונטפל בזה.
         </div>
       )}
 

@@ -20,6 +20,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getGrowConfig, GrowNotConfiguredError } from "@/lib/grow/client";
 import { PRO_PRICING_ILS, type BillingInterval } from "@/lib/grow/plans";
+import { getAppUrl } from "@/lib/appUrl";
 
 function isBillingInterval(value: unknown): value is BillingInterval {
   return value === "monthly" || value === "annual";
@@ -90,7 +91,12 @@ export async function POST(request: NextRequest) {
   }
 
   const pricing = PRO_PRICING_ILS[interval];
-  const origin = request.headers.get("origin") ?? `${request.nextUrl.protocol}//${request.nextUrl.host}`;
+  // NEXT_PUBLIC_APP_URL is the canonical base — the `origin` header is set by whoever sends the
+  // request, so it can't be trusted for URLs handed to a third-party payment processor. Falls
+  // back to the request origin only when that env var isn't configured yet (local dev).
+  const origin = getAppUrl(
+    request.headers.get("origin") ?? `${request.nextUrl.protocol}//${request.nextUrl.host}`
+  );
 
   const form = new URLSearchParams();
   form.set("userId", config.userId);
@@ -99,11 +105,21 @@ export async function POST(request: NextRequest) {
   form.set("description", `${pricing.displayName} — מנתח טווחי פוקר`);
   form.set("successUrl", `${origin}/billing?checkout=success`);
   form.set("cancelUrl", `${origin}/billing?checkout=cancelled`);
-  // cField1 carries our own userId through the payment flow so the (currently unverified,
-  // see webhook route) notifyUrl callback can eventually be matched back to a Subscription row.
+  // cField1 carries our own userId through the payment flow so the notifyUrl callback can be
+  // matched back to a Subscription row — see src/app/api/grow/webhook/route.ts.
   form.set("cField1", userId);
   if (userEmail) form.set("pageField[email]", userEmail);
-  form.set("notifyUrl", `${origin}/api/grow/webhook`);
+
+  // Only we ever set notifyUrl (Grow just calls back whatever URL we gave it at checkout time),
+  // so a shared-secret token embedded in the URL itself is a reasonable self-verification
+  // mechanism until Grow support confirms an official one (HMAC signature header? IP allowlist?
+  // — ask before relying on anything stronger). See the webhook route's header comment for the
+  // fail-closed behavior when this env var isn't set.
+  const webhookSecret = process.env.GROW_WEBHOOK_SHARED_SECRET;
+  const notifyUrl = webhookSecret
+    ? `${origin}/api/grow/webhook?t=${encodeURIComponent(webhookSecret)}`
+    : `${origin}/api/grow/webhook`;
+  form.set("notifyUrl", notifyUrl);
 
   try {
     const res = await fetch(`${config.apiBaseUrl}/createPaymentProcess`, {
