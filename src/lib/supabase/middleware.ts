@@ -47,6 +47,7 @@ const PUBLIC_PATH_PREFIXES = [
   "/shared",
   "/terms",
   "/privacy",
+  "/offline",
   "/api",
   "/_next",
 ];

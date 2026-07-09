@@ -6,6 +6,7 @@ import { Panel, PanelBody } from "@/components/ui/Panel";
 import { Button } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/lib/supabase/auth-actions";
+import { clearAppCaches } from "@/lib/clearAppCaches";
 
 /**
  * Small profile/account menu shown next to the notification bell in AppShell's header row.
@@ -40,6 +41,7 @@ export function ProfileMenu() {
 
   const handleSignOut = async () => {
     setSigningOut(true);
+    await clearAppCaches();
     await signOut();
   };
 

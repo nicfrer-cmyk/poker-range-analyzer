@@ -19,6 +19,7 @@ import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/lib/supabase/auth-actions";
 import { canPerformAction } from "@/lib/plan";
 import { track } from "@/lib/analytics";
+import { clearAppCaches } from "@/lib/clearAppCaches";
 import { DangerZone } from "@/components/account/DangerZone";
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -159,6 +160,7 @@ export default function SettingsPage() {
 
   const handleSignOut = async () => {
     setSigningOut(true);
+    await clearAppCaches();
     await signOut();
   };
 

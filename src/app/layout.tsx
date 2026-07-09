@@ -26,6 +26,8 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "מנתח טווחי פוקר",
   },
+  // "?v=3" is the cache-buster for these static (non build-hashed) PNGs — keep this in sync
+  // with public/manifest.webmanifest and ICON_VERSION in public/sw.js if the icon files change.
   icons: {
     icon: "/icons/icon-192.png?v=3",
     apple: "/icons/icon-192.png?v=3",
