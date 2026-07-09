@@ -13,13 +13,20 @@ const isDev = process.env.NODE_ENV !== "production";
 // is the verification call it makes on submit. Inert (script never loads) when
 // NEXT_PUBLIC_TURNSTILE_SITE_KEY isn't set, but the CSP has to allow it either way since it's
 // static config, not conditional on that env var.
+//
+// PostHog (src/lib/analytics.ts) ships compiled into our own bundle (no external <script> tag),
+// so it only needs connect-src for its capture-event network calls — added only when analytics
+// is actually turned on, since NEXT_PUBLIC_POSTHOG_HOST is a real (if defaulted) env var here,
+// unlike the Turnstile case above.
+const analyticsProvider = process.env.NEXT_PUBLIC_ANALYTICS_PROVIDER;
+const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
 const CSP = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co https://challenges.cloudflare.com",
+  `connect-src 'self' https://*.supabase.co https://challenges.cloudflare.com${analyticsProvider === "posthog" ? ` ${posthogHost}` : ""}`,
   "frame-src https://challenges.cloudflare.com",
   "object-src 'none'",
   "base-uri 'self'",

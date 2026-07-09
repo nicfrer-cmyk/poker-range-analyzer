@@ -48,13 +48,15 @@ const PUBLIC_PATH_PREFIXES = [
   "/terms",
   "/privacy",
   "/offline",
+  "/welcome",
   "/api",
   "/_next",
 ];
 
 /** Auth-only pages: redirect an already-signed-in user away from these (avoids a pointless
- *  re-login screen and prevents a loop with the "already authenticated" redirect below). */
-const AUTH_ENTRY_PATHS = new Set(["/login", "/signup"]);
+ *  re-login screen and prevents a loop with the "already authenticated" redirect below).
+ *  `/welcome` is the marketing landing page — a signed-in user doesn't need to see it either. */
+const AUTH_ENTRY_PATHS = new Set(["/login", "/signup", "/welcome"]);
 
 function isPublicPath(pathname: string): boolean {
   if (
@@ -138,6 +140,11 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   // Everything else is an `(app)` page — require a signed-in user (Phase 1: registration is
   // mandatory before using the app at all).
   if (!user) {
+    // The home page is the one exception: an unauthenticated visitor gets the marketing
+    // landing page instead of being bounced straight to a login form.
+    if (pathname === "/") {
+      return withCarriedCookies(response, NextResponse.redirect(new URL("/welcome", request.url)));
+    }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
     return withCarriedCookies(response, NextResponse.redirect(loginUrl));

@@ -59,7 +59,11 @@ export interface PlanLimits {
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   FREE: {
     dailyAnalysisLimit: 3,
-    dailyQuickAnalysisLimit: 10,
+    dailyQuickAnalysisLimit: 3,
+    // maxSavedHands and maxOpponentProfiles are also enforced at the DB level (defense-in-depth
+    // against a direct write, not just this app's own UI/routes) by BEFORE INSERT triggers in
+    // prisma/migrations/20260709130000_free_plan_db_quotas — those triggers hardcode the same
+    // 25 / 3 values with no shared source of truth, so update both places if either changes.
     maxSavedHands: 25,
     dailyImportLimit: 5,
     bulkImportAllowed: false,

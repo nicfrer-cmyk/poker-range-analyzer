@@ -20,6 +20,12 @@
   --color-accent-soft: 70 70 198;
 
   --bg-radial-tint: 91, 91, 224;
+
+  /* Combines the two Heebo subset files (src/app/layout.tsx's heeboHebrew/heeboLatin
+     localFont() calls) into the one public font-family stack tailwind.config.ts reads —
+     next/font/local has no per-file unicode-range, so this relies on ordinary CSS font-family
+     fallback (the hebrew file has no latin glyphs and vice versa, so there's no ambiguity). */
+  --font-heebo: var(--font-heebo-hebrew), var(--font-heebo-latin);
 }
 
 :root[data-theme="dark"] {

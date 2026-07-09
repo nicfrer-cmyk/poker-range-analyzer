@@ -25,7 +25,7 @@ export default async function ForgotPasswordPage(
             <span className="text-2xl">♠</span>
             <h1 className="mt-2 text-lg font-semibold">שחזור סיסמה</h1>
             <p className="mt-1 text-xs text-base-muted">
-              נזין את כתובת האימייל ונשלח קישור לאיפוס הסיסמה.
+              הזן את כתובת המייל ונשלח לך קישור לאיפוס הסיסמה.
             </p>
           </div>
 

@@ -97,7 +97,7 @@ function rotate(px, py, angle) {
   return [px * c - py * s, px * s + py * c];
 }
 
-function makePng(size) {
+function computeIconPixels(size) {
   const bg = [91, 91, 224]; // #5B5BE0 accent purple
   const cardFace = [250, 250, 252];
   const cardBorder = [28, 28, 46];
@@ -173,25 +173,35 @@ function makePng(size) {
     }
   }
 
+  return pixels;
+}
+
+/** Encodes a flat [r,g,b] pixel grid as a PNG. `rgba: true` adds an opaque alpha channel —
+ *  Next.js's own favicon.ico decoder (see makeFavicon below) rejects RGB-only PNGs, requiring
+ *  RGBA, while the PWA manifest icons have no such requirement and stay RGB (smaller). */
+function encodePng(pixels, size, { rgba = false } = {}) {
+  const channels = rgba ? 4 : 3;
+
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(size, 0);
   ihdr.writeUInt32BE(size, 4);
   ihdr[8] = 8; // bit depth
-  ihdr[9] = 2; // color type RGB
+  ihdr[9] = rgba ? 6 : 2; // color type: 6 = RGBA, 2 = RGB
   ihdr[10] = 0;
   ihdr[11] = 0;
   ihdr[12] = 0;
 
-  const raw = Buffer.alloc(size * (1 + size * 3));
+  const raw = Buffer.alloc(size * (1 + size * channels));
   for (let y = 0; y < size; y++) {
-    const rowStart = y * (1 + size * 3);
+    const rowStart = y * (1 + size * channels);
     raw[rowStart] = 0; // filter byte
     for (let x = 0; x < size; x++) {
-      const idx = rowStart + 1 + x * 3;
+      const idx = rowStart + 1 + x * channels;
       const [r, g, b] = pixels[y * size + x];
       raw[idx] = r;
       raw[idx + 1] = g;
       raw[idx + 2] = b;
+      if (rgba) raw[idx + 3] = 255;
     }
   }
 
@@ -205,8 +215,39 @@ function makePng(size) {
   ]);
 }
 
+function makePng(size) {
+  return encodePng(computeIconPixels(size), size, { rgba: false });
+}
+
 mkdirSync("public/icons", { recursive: true });
 for (const size of [192, 512]) {
   writeFileSync(`public/icons/icon-${size}.png`, makePng(size));
 }
 console.log("Generated pocket-aces PWA icons in public/icons/");
+
+// favicon.ico: modern ICO files can embed a PNG directly (supported since Windows Vista) instead
+// of a raw BMP, so this just wraps the same pixel-art generator's output in a minimal
+// ICONDIR/ICONDIRENTRY container rather than needing a separate BMP encoder. Next.js's own
+// favicon decoder (run at build time) requires the embedded PNG to be RGBA, not RGB.
+function makeFavicon(size) {
+  const png = encodePng(computeIconPixels(size), size, { rgba: true });
+  const iconDir = Buffer.alloc(6);
+  iconDir.writeUInt16LE(0, 0); // reserved
+  iconDir.writeUInt16LE(1, 2); // type: 1 = icon
+  iconDir.writeUInt16LE(1, 4); // image count
+
+  const entry = Buffer.alloc(16);
+  entry[0] = size; // width (0 would mean 256, fine up to 255)
+  entry[1] = size; // height
+  entry[2] = 0; // color count (0 = not palette-based)
+  entry[3] = 0; // reserved
+  entry.writeUInt16LE(1, 4); // color planes
+  entry.writeUInt16LE(32, 6); // bits per pixel — matches the embedded PNG's RGBA output
+  entry.writeUInt32LE(png.length, 8); // size of embedded PNG
+  entry.writeUInt32LE(6 + 16, 12); // offset of embedded PNG data
+
+  return Buffer.concat([iconDir, entry, png]);
+}
+
+writeFileSync("src/app/favicon.ico", makeFavicon(32));
+console.log("Generated src/app/favicon.ico");

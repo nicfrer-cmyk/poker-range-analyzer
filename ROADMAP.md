@@ -4,6 +4,64 @@ Source spec: `poker-analyzer-spec.pdf` (Hebrew, v1.0, July 2026). This file trac
 actually built vs. what's still blocked on a real decision or credential — read this before
 assuming something is "done."
 
+## Post-audit remediation pass — 2026-07-09
+
+Fixed every finding from the same day's "Pre-payment full audit" below, in six ordered stages,
+each committed separately.
+
+**Stage 1 — payments, closing the loop**: Grow checkout/webhook URLs now derive from
+`NEXT_PUBLIC_APP_URL` instead of the client-controlled `Origin` header. The webhook
+(`src/app/api/grow/webhook/route.ts`) is no longer a no-op stub — it's implemented behind a
+self-verifying shared-secret token embedded in `notifyUrl` (`GROW_WEBHOOK_SHARED_SECRET`),
+fail-closed exactly like the old stub when unset/mismatched. On a verified call it resolves
+`cField1` to a user, flags (doesn't reject) amount mismatches, upserts an idempotent
+`Subscription` row, and sets `users.plan = PRO`. Real Grow webhook verification with their
+support team is still the eventual goal — see "Blocked on the user" below; `scripts/set-plan.mjs`
+is the manual fallback until then. Billing success copy no longer over-promises.
+
+**Stage 2 — legal & account**: `/terms` and `/privacy` (draft copy, flagged for legal review),
+linked from signup/login/settings; 18+ notice on signup and the new landing page. Self-service
+account deletion (`/api/account/delete` + a Settings "danger zone") — deletes every DB row in
+FK-safe order, then the Supabase Auth user itself via a new service-role admin client
+(`src/lib/supabase/admin.ts`).
+
+**Stage 3 — AI cost/resilience**: both AI routes moved `claude-opus-4-8` → `claude-sonnet-4-6`;
+hand-review `max_tokens` 1024 → 2000 (reviews were getting cut off); `refundAiQuota()` added so
+a failed Anthropic call no longer burns a user's daily quota; Cloudflare Turnstile on
+signup/login behind `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
+
+**Stage 4 — service worker / PWA**: `public/sw.js` rewritten — cache-first now applies only to
+`/_next/static/`, `/icons/`, and the manifest; navigations are network-only with a new
+`/offline` fallback page. Previously every GET (including authenticated HTML/RSC) was cached
+and any failure fell back to `/` regardless of request type. Cache Storage is cleared on
+sign-out and account deletion.
+
+**Stage 5 — performance**: range-vs-range and the range explorer panel now run their equity
+calcs in a Web Worker instead of blocking the main thread. Turbopack treats
+`new Worker(new URL("./file.ts", import.meta.url))` as a static-asset copy rather than
+compiling it (confirmed live, not just from docs) — worked around by pre-bundling the worker
+with esbuild into `public/equity-worker.js` via a `predev`/`prebuild` step. Verified end-to-end
+in a real browser (constructs, computes, returns correct equity). Training Mode's scenario
+generator was the actual root cause of the 95s+ smoke test — it ran up to 5 full 3000-iteration
+Monte Carlo equity calcs per question; dropped to 200 iterations / 3 candidates, well within the
+trainer's own correctness margins, bringing the smoke test to ~8-10s.
+
+**Stage 6 — landing page, SEO, polish**: public `/welcome` marketing page (unauthenticated `/`
+now redirects here instead of `/login`); `next/font/local` self-hosting instead of
+`next/font/google` (same subsetted `.woff2` files, vendored — zero visual change, zero
+build-time network dependency); Hebrew `not-found.tsx`/`error.tsx`/`global-error.tsx`;
+`robots.ts`/`sitemap.ts`/a real `favicon.ico`; a hand-generated `public/og.png` for social
+previews; PostHog analytics wired behind `NEXT_PUBLIC_ANALYTICS_PROVIDER="posthog"` (compiled
+into the bundle, not an external script); DB-level triggers enforcing the FREE plan's
+`maxSavedHands`/`maxOpponentProfiles` caps as defense-in-depth
+(`prisma/migrations/20260709130000_free_plan_db_quotas` — **not yet applied to the live
+database**, same as every other migration in this file that hasn't been explicitly marked
+applied). Sentry was deliberately skipped — see README.md's "Known deferrals".
+
+**Known non-blocking lint debt**: unchanged from the entry below — still ~26 pre-existing
+`react-hooks/set-state-in-effect` errors in files this pass didn't touch, confirmed via
+per-file `eslint` runs after every stage that nothing new was introduced.
+
 ## Pre-payment full audit — 2026-07-09
 
 End-to-end audit + hardening pass across the whole app before connecting real billing. By this
@@ -266,15 +324,17 @@ tracker. Building these is the natural "Wave 2/3/4" next step per the spec's own
      Grow support — `GROW_API_BASE_URL` currently defaults to their sandbox host
      (`sandbox.meshulam.co.il`), inferred by mirroring the confirmed sandbox URL, not
      independently confirmed.
-  2. **Webhook verification — the real blocker.** `src/app/api/grow/webhook/route.ts` is a
-     deliberate no-op stub: it logs whatever it receives but never touches the `Subscription`
-     table. Grow's public docs (grow-il.readme.io) don't document how to verify a webhook call
-     genuinely came from Grow (shared secret? HMAC signature header?) — the docs just say
-     webhooks must be "enabled for your account" by Grow support, which is almost certainly
-     where that mechanism gets communicated. Implementing that check is a hard prerequisite
-     before this route can safely upgrade anyone's plan — without it, anyone who finds the
-     webhook URL could forge a fake "payment succeeded" call. Ask Grow support directly rather
-     than guessing.
+  2. **Webhook verification — still not official.** As of the 2026-07-09 remediation pass,
+     `src/app/api/grow/webhook/route.ts` is no longer a no-op stub — it processes real payloads
+     and upgrades plans, gated behind a self-verifying shared-secret token
+     (`GROW_WEBHOOK_SHARED_SECRET`) embedded in the `notifyUrl` we hand Grow at checkout time
+     (only we ever set that URL, so a matching token is a reasonable stand-in). This is still
+     not Grow's own official mechanism — their public docs (grow-il.readme.io) don't document
+     one (shared secret? HMAC signature header?), just that webhooks must be "enabled for your
+     account" by Grow support, which is almost certainly where the real mechanism gets
+     communicated. Ask Grow support directly, then either confirm the current self-verification
+     is sufficient or layer their official check on top — see the TODO comment at the top of
+     that route file. `scripts/set-plan.mjs` remains the manual fallback in the meantime.
   Pricing shown (₪49/mo, ₪410/yr) is a placeholder converted from the earlier USD placeholder
   — real ILS pricing still needs competitor research, same caveat as before.
 - ~~**Netlify**~~ — done: live at https://poker-range-analyzer.netlify.app (see above). Still

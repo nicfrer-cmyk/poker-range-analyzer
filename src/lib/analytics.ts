@@ -1,23 +1,22 @@
 // ---------------------------------------------------------------------------
 // Product analytics event plumbing.
 //
-// No real analytics provider (PostHog / GA4 / Mixpanel / Segment) is connected
-// yet. Every call site in the app calls `track(event, props)` regardless —
-// the same "degrade gracefully, never fake" pattern used by every other
-// not-yet-configured integration in this codebase (see
-// `src/lib/stripe/client.ts`, `src/lib/grow/client.ts`,
-// `src/lib/supabase/auth-actions.ts`): call sites never need to know whether
-// a real provider is wired up, and nothing ever crashes because one isn't.
+// Every call site in the app calls `track(event, props)` regardless of whether a real provider
+// is configured — the same "degrade gracefully, never fake" pattern used by every other
+// not-yet-configured integration in this codebase (see `src/lib/stripe/client.ts`,
+// `src/lib/grow/client.ts`, `src/lib/supabase/auth-actions.ts`): call sites never need to know
+// whether a real provider is wired up, and nothing ever crashes because one isn't.
 //
-// LOCAL-ONLY NOTE: until `NEXT_PUBLIC_ANALYTICS_PROVIDER` is set (see
-// `.env.example`), `track()` just `console.debug()`s the event instead of
-// sending it anywhere — visible in dev tools, harmless in production, and
-// deliberately *not* a silent no-op that could be mistaken for "not wired up
-// at all". Once a provider is chosen: set `NEXT_PUBLIC_ANALYTICS_PROVIDER`
-// and implement `sendToProvider` below — that is the only place that should
-// need to change; every `track(...)` call site elsewhere in the app stays
-// exactly as-is.
+// LOCAL-ONLY NOTE: until `NEXT_PUBLIC_ANALYTICS_PROVIDER` is set (see `.env.example`), `track()`
+// just `console.debug()`s the event instead of sending it anywhere — visible in dev tools,
+// harmless in production, and deliberately *not* a silent no-op that could be mistaken for "not
+// wired up at all". Set `NEXT_PUBLIC_ANALYTICS_PROVIDER="posthog"` + `NEXT_PUBLIC_POSTHOG_KEY`
+// (+ optionally `NEXT_PUBLIC_POSTHOG_HOST`) to turn on the real PostHog send below — remember to
+// also add that host to `connect-src` in `next.config.mjs` (already done for the default host;
+// only matters if you point `NEXT_PUBLIC_POSTHOG_HOST` somewhere else).
 // ---------------------------------------------------------------------------
+
+import posthog from "posthog-js";
 
 export type AnalyticsEvent =
   | "signup_started"
@@ -70,15 +69,40 @@ function getSessionId(): string | undefined {
   }
 }
 
+let posthogInitialized = false;
+
+/** Lazily initializes the PostHog client on first use, client-side only — posthog-js reaches
+ *  for `window`/`document` internally, so this must never run during SSR. Returns whether
+ *  PostHog is actually ready to receive a `capture()` call. */
+function ensurePosthogReady(): boolean {
+  if (typeof window === "undefined") return false;
+  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  if (!key) return false;
+  if (!posthogInitialized) {
+    posthog.init(key, {
+      api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com",
+      // This file already fires its own well-defined event set with explicit props — PostHog's
+      // autocapture/pageview features would just duplicate that with noisier, less meaningful
+      // events.
+      autocapture: false,
+      capture_pageview: false,
+    });
+    posthogInitialized = true;
+  }
+  return true;
+}
+
 /**
- * TODO: wire a real analytics provider here once one is chosen (PostHog / GA4 / Mixpanel /
- * Segment, ...). E.g. `window.posthog?.capture(event, payload)` for a client-side snippet, or a
- * `fetch("/api/analytics", ...)` relay if server-fired events need to reach it too. This is the
- * only function that should need to change — every `track()` call site in the app stays as-is.
+ * Forwards an event to the configured analytics provider. Compiled into the app bundle via the
+ * `posthog-js` package (no external `<script src="...">` tag), active only when
+ * `NEXT_PUBLIC_ANALYTICS_PROVIDER="posthog"` and `NEXT_PUBLIC_POSTHOG_KEY` are both set — no-ops
+ * otherwise (including server-side, where posthog-js can't run at all) and every event still
+ * reaches `console.debug` in `track()` below regardless.
  */
 function sendToProvider(event: AnalyticsEvent, payload: Record<string, unknown>): void {
-  void event;
-  void payload;
+  if (process.env.NEXT_PUBLIC_ANALYTICS_PROVIDER !== "posthog") return;
+  if (!ensurePosthogReady()) return;
+  posthog.capture(event, payload);
 }
 
 /**
