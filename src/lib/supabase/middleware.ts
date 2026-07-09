@@ -45,6 +45,8 @@ const PUBLIC_PATH_PREFIXES = [
   "/forgot-password",
   "/reset-password",
   "/shared",
+  "/terms",
+  "/privacy",
   "/api",
   "/_next",
 ];

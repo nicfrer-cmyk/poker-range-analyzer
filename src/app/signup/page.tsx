@@ -83,7 +83,17 @@ export default async function SignupPage(
             <PasswordField minLength={8} placeholder="סיסמה (לפחות 8 תווים)" />
             <label className="flex items-start gap-2 text-xs text-base-muted">
               <input type="checkbox" name="consent" required className="mt-0.5" />
-              אני מאשר/ת את תנאי השימוש ומדיניות הפרטיות.
+              <span>
+                אני מאשר/ת שגילי 18 ומעלה, ומסכים/ה ל
+                <Link href="/terms" target="_blank" className="text-accent-soft underline">
+                  תנאי השימוש
+                </Link>{" "}
+                ול
+                <Link href="/privacy" target="_blank" className="text-accent-soft underline">
+                  מדיניות הפרטיות
+                </Link>
+                .
+              </span>
             </label>
             <Button type="submit" className="w-full">
               צור חשבון

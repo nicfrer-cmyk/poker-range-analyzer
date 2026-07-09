@@ -112,6 +112,15 @@ export default async function LoginPage(
               הרשמה
             </Link>
           </p>
+          <p className="text-center text-xs text-base-muted">
+            <Link href="/terms" className="text-accent-soft underline">
+              תנאי שימוש
+            </Link>{" "}
+            ·{" "}
+            <Link href="/privacy" className="text-accent-soft underline">
+              מדיניות פרטיות
+            </Link>
+          </p>
         </PanelBody>
       </Panel>
     </div>

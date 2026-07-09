@@ -19,6 +19,7 @@ import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/lib/supabase/auth-actions";
 import { canPerformAction } from "@/lib/plan";
 import { track } from "@/lib/analytics";
+import { DangerZone } from "@/components/account/DangerZone";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -483,8 +484,19 @@ export default function SettingsPage() {
             יומן הבנקרול הוא היוצא מן הכלל: הוא נשמר רק במכשיר ובדפדפן הנוכחיים (לא בענן), ולכן
             אינו מסונכרן בין מכשירים ולא יופיע אם תתחבר ממכשיר אחר.
           </p>
+          <p>
+            <Link href="/terms" className="text-accent-soft underline">
+              תנאי שימוש
+            </Link>{" "}
+            ·{" "}
+            <Link href="/privacy" className="text-accent-soft underline">
+              מדיניות פרטיות
+            </Link>
+          </p>
         </PanelBody>
       </Panel>
+
+      <DangerZone />
     </div>
   );
 }
