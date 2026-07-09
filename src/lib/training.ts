@@ -172,7 +172,14 @@ export interface AnswerEvaluation {
 // Generation internals
 // ---------------------------------------------------------------------------
 
-const TRAINING_ITERATIONS = 3000;
+// Monte Carlo trials per candidate equity calc. This runs synchronously on the caller's thread
+// (main thread in the browser today — see the equity Web Worker for the heavier /analyze and
+// /range-vs-range paths), so it directly gates how long a weak device pauses per training
+// question. 200 trials keeps the standard error comfortably below the 4-15 percentage-point
+// margins `deriveCorrectAction` uses below — this is a plain-language pot-odds trainer, not a
+// precision solver, so that's a fine trade for responsiveness. Lower this further only after
+// checking it doesn't start flipping close-margin scenarios' correct answer noticeably often.
+const TRAINING_ITERATIONS = 200;
 
 function pick<T>(arr: readonly T[], rng: () => number): T {
   return arr[Math.floor(rng() * arr.length)] as T;
@@ -459,7 +466,10 @@ function tryBuildScenario(trackId: TrackId, rng: () => number): TrainingScenario
   };
 }
 
-const CANDIDATES_PER_PICK = 5;
+// Each point here is a full equity calc (TRAINING_ITERATIONS trials), so this is the other
+// lever on per-question generation cost alongside TRAINING_ITERATIONS above. 3 still gives the
+// missed-signature weighting below something real to pick among without the cost of 5.
+const CANDIDATES_PER_PICK = 3;
 const MISS_WEIGHT_BOOST = 2.5;
 const MAX_GENERATION_ATTEMPTS = 6;
 

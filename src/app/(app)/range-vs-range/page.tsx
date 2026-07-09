@@ -24,8 +24,9 @@ import { canPerformAction } from "@/lib/plan";
 import { useTheme } from "@/lib/useTheme";
 import type { StatusTone } from "@/lib/statusTone";
 import { parseRange, rangeToCombos, removeConflicts } from "@/lib/engine/range";
-import { calculateEquity, type EquityResult } from "@/lib/engine/equity";
-import type { Card, WeightedRange } from "@/lib/engine/types";
+import type { EquityInput, EquityResult } from "@/lib/engine/equity";
+import { calculateEquityBatchInWorker } from "@/lib/engine/equityWorkerClient";
+import type { Card, Combo, WeightedRange } from "@/lib/engine/types";
 
 const PAYWALL_TITLE = "פתח ניתוח טווח מול טווח";
 const PAYWALL_BODY =
@@ -80,19 +81,24 @@ const BUCKET_DEFS: { label: string; min: number; max: number; tone: StatusTone }
   { label: "80-100%", min: 80, max: 100.001, tone: "crushing" },
 ];
 
-function computeDistribution(heroRange: WeightedRange, villainRange: WeightedRange, board: Card[]) {
+/** Builds the sampled combo list + one EquityInput per combo — cheap, stays on the main thread.
+ *  The actual equity math for each of these runs in the worker (see runCalculate), batched
+ *  together with the aggregate calc in a single postMessage round trip. */
+function buildDistributionInputs(heroRange: WeightedRange, villainRange: WeightedRange, board: Card[]) {
   const heroCombos = rangeToCombos(heroRange);
   const sampled = sampleCombos(heroCombos, MAX_DISTRIBUTION_COMBOS);
+  const inputs: EquityInput[] = sampled.map((combo) => ({
+    heroCards: combo,
+    villainRange,
+    board,
+    iterations: DISTRIBUTION_ITERATIONS,
+  }));
+  return { heroCombos, sampled, inputs };
+}
+
+function bucketizeDistribution(sampled: Combo[], results: EquityResult[], totalCombos: number) {
   const samples = sampled
-    .map((combo) => {
-      const result = calculateEquity({
-        heroCards: combo,
-        villainRange,
-        board,
-        iterations: DISTRIBUTION_ITERATIONS,
-      });
-      return { combo, equityPct: result.heroEquity * 100 };
-    })
+    .map((combo, i) => ({ combo, equityPct: (results[i]?.heroEquity ?? NaN) * 100 }))
     .filter((s) => !Number.isNaN(s.equityPct));
 
   const buckets: DistributionBucket[] = BUCKET_DEFS.map((d) => ({
@@ -101,7 +107,7 @@ function computeDistribution(heroRange: WeightedRange, villainRange: WeightedRan
     count: samples.filter((s) => s.equityPct >= d.min && s.equityPct < d.max).length,
   }));
 
-  return { buckets, sampleCount: samples.length, totalCombos: heroCombos.length };
+  return { buckets, sampleCount: samples.length, totalCombos };
 }
 
 /** Plain-Hebrew, numbers-specific explanation — the actual point of this feature over a regular
@@ -145,7 +151,7 @@ export default function RangeVsRangePage() {
 
   const [results, setResults] = useState<{
     aggregate: EquityResult;
-    distribution: ReturnType<typeof computeDistribution>;
+    distribution: ReturnType<typeof bucketizeDistribution>;
     board: Card[];
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -183,7 +189,7 @@ export default function RangeVsRangePage() {
     setResults(null);
   };
 
-  const runCalculate = () => {
+  const runCalculate = async () => {
     setError(null);
 
     const gate = canPerformAction(plan, "useRangeVsRange");
@@ -213,24 +219,33 @@ export default function RangeVsRangePage() {
     }
 
     setCalculating(true);
-    // Deferred a tick so the "מחשב…" state actually paints before the (synchronous) equity math
-    // below blocks the main thread.
-    setTimeout(() => {
-      try {
-        const aggregate = calculateEquity({
-          heroRange: cleanHero,
-          villainRange: cleanVillain,
-          board: boardCards,
-          iterations: AGGREGATE_ITERATIONS,
-        });
-        const distribution = computeDistribution(cleanHero, cleanVillain, boardCards);
-        setResults({ aggregate, distribution, board: boardCards });
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "שגיאה בחישוב האקוויטי.");
-      } finally {
-        setCalculating(false);
-      }
-    }, 30);
+    try {
+      const aggregateInput: EquityInput = {
+        heroRange: cleanHero,
+        villainRange: cleanVillain,
+        board: boardCards,
+        iterations: AGGREGATE_ITERATIONS,
+      };
+      const { heroCombos, sampled, inputs: distributionInputs } = buildDistributionInputs(
+        cleanHero,
+        cleanVillain,
+        boardCards
+      );
+
+      // One worker round trip for the aggregate + every distribution sample, off the main
+      // thread — this used to run synchronously and could visibly block the UI for a moment.
+      const [aggregate, ...distributionResults] = await calculateEquityBatchInWorker([
+        aggregateInput,
+        ...distributionInputs,
+      ]);
+      const distribution = bucketizeDistribution(sampled, distributionResults, heroCombos.length);
+
+      setResults({ aggregate: aggregate as EquityResult, distribution, board: boardCards });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "שגיאה בחישוב האקוויטי.");
+    } finally {
+      setCalculating(false);
+    }
   };
 
   const boardSlots = [0, 1, 2, 3, 4];

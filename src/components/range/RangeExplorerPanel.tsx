@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/Panel";
 import { Button } from "@/components/ui/Button";
 import { Badge, equityTone } from "@/components/ui/Badge";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { PlayingCard } from "@/components/cards/PlayingCard";
 import { parseRange, rangeToCombos, comboKey } from "@/lib/engine/range";
-import { calculateEquity } from "@/lib/engine/equity";
+import type { EquityResult } from "@/lib/engine/equity";
+import { calculateEquityInWorker } from "@/lib/engine/equityWorkerClient";
 import { classifyHand } from "@/lib/engine/classify";
 import { outsFromDraws } from "@/lib/analysisEngine";
 import type { Card, Combo } from "@/lib/engine/types";
@@ -39,16 +41,32 @@ export function RangeExplorerPanel({
     return combos.find((c) => !dead.includes(c.c1) && !dead.includes(c.c2)) ?? combos[0];
   }, [label, dead]);
 
-  const equityResult = useMemo(() => {
-    if (!combo) return null;
-    const singleRange = new Map([[comboKey(combo), 1]]);
-    return calculateEquity({
+  // Keyed by the combo it was computed for, so `loadingEquity`/`equityResult` below can be
+  // derived during render instead of needing their own separate `setState` calls at the top of
+  // the effect (which a fresh combo's fetch-in-flight would otherwise require).
+  const [resolvedEquity, setResolvedEquity] = useState<{ comboKey: string; result: EquityResult } | null>(null);
+
+  useEffect(() => {
+    if (!combo) return;
+    let cancelled = false;
+    const key = comboKey(combo);
+    const singleRange = new Map([[key, 1]]);
+    calculateEquityInWorker({
       heroCards: heroCombo,
       villainRange: singleRange,
       board,
       iterations: EXPLORER_ITERATIONS,
+    }).then((result) => {
+      if (!cancelled) setResolvedEquity({ comboKey: key, result });
     });
+    return () => {
+      cancelled = true;
+    };
   }, [combo, heroCombo, board]);
+
+  const currentComboKey = combo ? comboKey(combo) : null;
+  const equityResult = resolvedEquity?.comboKey === currentComboKey ? resolvedEquity.result : null;
+  const loadingEquity = Boolean(combo) && resolvedEquity?.comboKey !== currentComboKey;
 
   const classification = useMemo(
     () => (combo ? classifyHand(combo, board) : null),
@@ -68,7 +86,16 @@ export function RangeExplorerPanel({
           </Button>
         </PanelHeader>
 
-        {!combo || !classification || !equityResult || Number.isNaN(equityResult.heroEquity) ? (
+        {loadingEquity ? (
+          <PanelBody className="space-y-3 py-4">
+            <div className="flex items-center justify-center gap-2">
+              <Skeleton className="h-16 w-12" />
+              <Skeleton className="h-16 w-12" />
+            </div>
+            <Skeleton className="mx-auto h-5 w-32" />
+            <Skeleton className="mx-auto h-4 w-48" />
+          </PanelBody>
+        ) : !combo || !classification || !equityResult || Number.isNaN(equityResult.heroEquity) ? (
           <PanelBody className="space-y-3 py-8 text-center text-sm text-base-muted">
             <p>אי אפשר לחשב קומבו עבור {label} מול הקלפים הידועים ביד הזו — כל הצירופים מתנגשים.</p>
           </PanelBody>
