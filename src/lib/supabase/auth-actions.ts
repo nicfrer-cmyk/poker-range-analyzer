@@ -47,15 +47,24 @@ async function getOrigin(): Promise<string> {
  * `redirectTo` is an optional third param (rather than changing the first two) so existing
  * 2-arg call sites keep behaving exactly as before. Callers are responsible for validating
  * `redirectTo` is a safe same-origin relative path — see `login/page.tsx`'s `safeNextPath`.
+ *
+ * `captchaToken` (optional 4th param, same additive convention) is forwarded to Supabase Auth
+ * as-is; Supabase only enforces it once Turnstile is enabled for the project in its dashboard,
+ * so passing an empty string when the widget isn't configured (see Turnstile.tsx) is harmless.
  */
 export async function signInWithEmail(
   email: string,
   password: string,
-  redirectTo: string = "/"
+  redirectTo: string = "/",
+  captchaToken?: string
 ): Promise<AuthActionResult> {
   try {
     const supabase = await createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: captchaToken ? { captchaToken } : undefined,
+    });
     if (error) return { error: translateAuthError(error.message) };
   } catch (err) {
     if (isConfigError(err)) return { error: err.message };
@@ -74,11 +83,14 @@ export async function signInWithEmail(
  *
  * `next` is a same-origin relative path to land on afterward, same contract as
  * `signInWithEmail`'s `redirectTo` — validate it before calling (see `safeNextPath`).
+ *
+ * `captchaToken` (optional 4th param): see `signInWithEmail`'s doc comment.
  */
 export async function signUpWithEmail(
   email: string,
   password: string,
-  next: string = "/"
+  next: string = "/",
+  captchaToken?: string
 ): Promise<AuthActionResult> {
   let hasSession = false;
   const callbackUrl = `${await getOrigin()}/auth/callback${next !== "/" ? `?next=${encodeURIComponent(next)}` : ""}`;
@@ -90,6 +102,7 @@ export async function signUpWithEmail(
       password,
       options: {
         emailRedirectTo: callbackUrl,
+        ...(captchaToken ? { captchaToken } : {}),
       },
     });
     if (error) return { error: translateAuthError(error.message) };

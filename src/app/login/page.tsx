@@ -2,6 +2,7 @@ import Link from "next/link";
 import { signInWithEmail, signInWithOAuth } from "@/lib/supabase/auth-actions";
 import { Button } from "@/components/ui/Button";
 import { Panel, PanelBody } from "@/components/ui/Panel";
+import { TurnstileField } from "@/components/auth/Turnstile";
 
 /** Only ever follow a same-origin relative path from `?next=` — never redirect to an
  *  absolute/external URL supplied by the query string (open-redirect protection). */
@@ -28,10 +29,11 @@ export default async function LoginPage(
     "use server";
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
+    const captchaToken = String(formData.get("captchaToken") ?? "");
     const next = safeNextPath(String(formData.get("next") ?? ""));
     // One-shot flag so AppShell can show a brief "welcome back" toast right after login.
     const redirectTo = `${next}${next.includes("?") ? "&" : "?"}justLoggedIn=1`;
-    const result = await signInWithEmail(email, password, redirectTo);
+    const result = await signInWithEmail(email, password, redirectTo, captchaToken || undefined);
     if (result.error) {
       const { redirect } = await import("next/navigation");
       const params = new URLSearchParams({ error: result.error });
@@ -93,6 +95,7 @@ export default async function LoginPage(
                 שכחתי סיסמה
               </Link>
             </div>
+            <TurnstileField />
             <Button type="submit" className="w-full">
               התחבר
             </Button>

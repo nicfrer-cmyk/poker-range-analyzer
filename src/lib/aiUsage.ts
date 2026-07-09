@@ -50,3 +50,17 @@ export async function checkAndIncrementAiQuota(userId: string): Promise<AiQuotaR
   }
   return { allowed: true };
 }
+
+/**
+ * Refunds one unit of today's AI-usage count for `userId` — call this from the catch block
+ * around the Anthropic call, once checkAndIncrementAiQuota already allowed the attempt but the
+ * call itself then failed, so the failed attempt doesn't count against the daily limit. The
+ * `count: { gt: 0 }` guard makes this a safe no-op if there's nothing to refund (e.g. a Pro user,
+ * who never had a row incremented in the first place) — it can never take the counter negative.
+ */
+export async function refundAiQuota(userId: string): Promise<void> {
+  await prisma.aiUsageDaily.updateMany({
+    where: { userId, usageDate: todayUtcDate(), count: { gt: 0 } },
+    data: { count: { decrement: 1 } },
+  });
+}

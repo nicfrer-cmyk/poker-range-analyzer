@@ -3,6 +3,7 @@ import { signUpWithEmail, signInWithOAuth } from "@/lib/supabase/auth-actions";
 import { Button } from "@/components/ui/Button";
 import { Panel, PanelBody } from "@/components/ui/Panel";
 import { PasswordField } from "@/components/auth/PasswordField";
+import { TurnstileField } from "@/components/auth/Turnstile";
 import { track } from "@/lib/analytics";
 
 /** Same guard as login/page.tsx's safeNextPath — only ever follow a same-origin relative
@@ -33,6 +34,7 @@ export default async function SignupPage(
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
     const consent = formData.get("consent");
+    const captchaToken = String(formData.get("captchaToken") ?? "");
     const formNext = safeNextPath(String(formData.get("next") ?? ""));
     if (!consent) {
       const { redirect } = await import("next/navigation");
@@ -40,7 +42,7 @@ export default async function SignupPage(
       if (formNext !== "/") params.set("next", formNext);
       redirect(`/signup?${params.toString()}`);
     }
-    const result = await signUpWithEmail(email, password, formNext);
+    const result = await signUpWithEmail(email, password, formNext, captchaToken || undefined);
     if (result.error) {
       const { redirect } = await import("next/navigation");
       const params = new URLSearchParams({ error: result.error });
@@ -95,6 +97,7 @@ export default async function SignupPage(
                 .
               </span>
             </label>
+            <TurnstileField />
             <Button type="submit" className="w-full">
               צור חשבון
             </Button>

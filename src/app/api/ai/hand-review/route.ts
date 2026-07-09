@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { checkAndIncrementAiQuota } from "@/lib/aiUsage";
+import { checkAndIncrementAiQuota, refundAiQuota } from "@/lib/aiUsage";
 import { ALLOWED_IMAGE_MEDIA_TYPES, MAX_IMAGE_BASE64_LENGTH, type AllowedImageMediaType } from "@/lib/aiImage";
 
 // ---------------------------------------------------------------------------
@@ -140,8 +140,8 @@ export async function POST(request: NextRequest) {
   try {
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
-      model: "claude-opus-4-8",
-      max_tokens: 1024,
+      model: "claude-sonnet-4-6",
+      max_tokens: 2000,
       system: imageBase64 && mediaType ? IMAGE_SYSTEM_PROMPT : TEXT_SYSTEM_PROMPT,
       messages: [
         {
@@ -174,6 +174,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ review: textBlock.text });
   } catch (err) {
+    await refundAiQuota(userId);
     const message = err instanceof Error ? err.message : "שגיאה לא ידועה";
     return NextResponse.json(
       { error: `שגיאה בקריאה ל-AI: ${message}` },

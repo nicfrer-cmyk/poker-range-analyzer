@@ -8,13 +8,19 @@
 // functional cost: fonts are self-hosted via next/font (no external font-src needed), and the
 // only cross-origin browser calls are to Supabase's own REST/Auth API.
 const isDev = process.env.NODE_ENV !== "production";
+// challenges.cloudflare.com: Cloudflare Turnstile CAPTCHA (src/components/auth/Turnstile.tsx) —
+// script-src loads its widget script, frame-src is the challenge iframe it renders, connect-src
+// is the verification call it makes on submit. Inert (script never loads) when
+// NEXT_PUBLIC_TURNSTILE_SITE_KEY isn't set, but the CSP has to allow it either way since it's
+// static config, not conditional on that env var.
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co",
+  "connect-src 'self' https://*.supabase.co https://challenges.cloudflare.com",
+  "frame-src https://challenges.cloudflare.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
