@@ -20,14 +20,20 @@ const isDev = process.env.NODE_ENV !== "production";
 // unlike the Turnstile case above.
 const analyticsProvider = process.env.NEXT_PUBLIC_ANALYTICS_PROVIDER;
 const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
+// AdSense (src/components/ads/AdSlot.tsx) loads an external script, renders ads inside
+// cross-origin iframes, and calls out for impression/click tracking — all three need their own
+// CSP directive. Conditional on the client id being set (unlike Turnstile's always-on entries
+// above) since these are a lot of extra third-party domains to trust for a feature that, unlike
+// Turnstile, isn't part of this app's own security posture.
+const adsenseEnabled = Boolean(process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID);
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${isDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${adsenseEnabled ? " https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://*.googletagservices.com" : ""}${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob:${adsenseEnabled ? " https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com" : ""}`,
   "font-src 'self' data:",
-  `connect-src 'self' https://*.supabase.co https://challenges.cloudflare.com${analyticsProvider === "posthog" ? ` ${posthogHost}` : ""}`,
-  "frame-src https://challenges.cloudflare.com",
+  `connect-src 'self' https://*.supabase.co https://challenges.cloudflare.com${analyticsProvider === "posthog" ? ` ${posthogHost}` : ""}${adsenseEnabled ? " https://*.googlesyndication.com https://*.google.com https://*.doubleclick.net https://*.googleadservices.com https://adtrafficquality.google" : ""}`,
+  `frame-src https://challenges.cloudflare.com${adsenseEnabled ? " https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://googleads.g.doubleclick.net https://*.adtrafficquality.google" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

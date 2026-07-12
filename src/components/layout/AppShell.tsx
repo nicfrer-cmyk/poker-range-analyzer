@@ -5,6 +5,7 @@ import { AuthSync } from "./AuthSync";
 import { NotificationBell } from "./NotificationBell";
 import { ProfileMenu } from "./ProfileMenu";
 import { OnboardingTrigger } from "@/components/onboarding/OnboardingTrigger";
+import { AdSlot } from "@/components/ads/AdSlot";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -20,6 +21,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <PostGameNotice className="mb-4" />
           {children}
+          <AdSlot />
         </main>
       </div>
       <BottomNav />
