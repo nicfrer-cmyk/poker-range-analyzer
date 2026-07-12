@@ -96,6 +96,10 @@ export default function RootLayout({
       className={`${heeboHebrew.variable} ${heeboLatin.variable} ${inter.variable}`}
     >
       <head>
+        {/* AdSense site-ownership verification (adsense.google.com > this site > Settings >
+            Verify ownership > meta tag). Static and unconditional — unlike AdSlot.tsx's ads
+            themselves, this only proves domain control and costs nothing to leave in place. */}
+        <meta name="google-adsense-account" content="ca-pub-4425334362941690" />
         {/* Sets the theme attribute before first paint so switching to dark mode in Settings
             doesn't flash the light theme on the next page load. Light stays the default. */}
         <script
