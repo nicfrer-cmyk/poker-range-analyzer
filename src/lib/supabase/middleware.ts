@@ -123,9 +123,18 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   // Refreshes the auth token if it's expired. Required for Server Components
   // to reliably read a valid session, since they can't write cookies
   // themselves — this is the one place in the request lifecycle that can.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  //
+  // Wrapped: a transient network/outage error talking to Supabase must not crash the edge
+  // function for every visitor (observed live — an unhandled rejection here took down the whole
+  // site). Fails closed, same as a genuinely unauthenticated request, rather than granting access
+  // on an ambiguous failure.
+  let user = null;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+  } catch {
+    user = null;
+  }
 
   // Already signed in and visiting /login or /signup — send them to the app instead of
   // showing a pointless login screen again.
