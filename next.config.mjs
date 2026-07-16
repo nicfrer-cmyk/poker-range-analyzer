@@ -1,12 +1,16 @@
 // `'unsafe-inline'` on script-src is required by the small theme-flash-prevention inline
 // script in `src/app/layout.tsx` (a fixed, static string — no user input ever reaches it).
-// `'unsafe-eval'` is added in development only — Next's dev-mode bundler evaluates modules
-// via `eval()` for Fast Refresh/HMR (confirmed live: without it, every page throws
-// "EvalError: ... violates ... 'unsafe-eval' is not an allowed source"). `next build`/`next
-// start` don't use eval-based bundling, so production stays without it, matching Next's own
-// documented CSP guidance. Everything else here is a real restriction with no known
-// functional cost: fonts are self-hosted via next/font (no external font-src needed), and the
-// only cross-origin browser calls are to Supabase's own REST/Auth API.
+// `'unsafe-eval'` is added in development always (Next's dev-mode bundler evaluates modules via
+// `eval()` for Fast Refresh/HMR — confirmed live: without it, every page throws "EvalError: ...
+// violates ... 'unsafe-eval' is not an allowed source") and in production only when AdSense is
+// enabled — some Google ad creative formats use eval()/new Function() internally (confirmed live
+// via a real CSP violation blocking ad rendering with AdSense on). This is a deliberate security
+// trade-off, made with the site owner: it weakens XSS defense-in-depth site-wide, not just for
+// ads, in exchange for ad formats actually rendering. Revisit if AdSense is ever removed —
+// without `adsenseEnabled`, production would otherwise stay without it, matching Next's own
+// documented CSP guidance. Everything else here is a real restriction with no known functional
+// cost: fonts are self-hosted via next/font (no external font-src needed), and the only other
+// cross-origin browser calls are to Supabase's own REST/Auth API.
 const isDev = process.env.NODE_ENV !== "production";
 // challenges.cloudflare.com: Cloudflare Turnstile CAPTCHA (src/components/auth/Turnstile.tsx) —
 // script-src loads its widget script, frame-src is the challenge iframe it renders, connect-src
@@ -28,7 +32,7 @@ const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.postho
 const adsenseEnabled = Boolean(process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID);
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${adsenseEnabled ? " https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://*.googletagservices.com https://*.adtrafficquality.google" : ""}${isDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${adsenseEnabled ? " https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://*.googletagservices.com https://*.adtrafficquality.google" : ""}${isDev || adsenseEnabled ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob:${adsenseEnabled ? " https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.adtrafficquality.google" : ""}`,
   "font-src 'self' data:",
