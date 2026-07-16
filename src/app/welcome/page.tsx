@@ -4,6 +4,7 @@ import { Panel, PanelBody } from "@/components/ui/Panel";
 import { PLAN_LIMITS } from "@/lib/plan";
 import { PRO_PRICING_ILS } from "@/lib/grow/plans";
 import { SUPPORT_EMAIL } from "@/lib/support";
+import { AdSlot } from "@/components/ads/AdSlot";
 
 export const metadata = {
   title: "מנתח טווחי פוקר — הבינו איפה היד שלך עמדה באמת",
@@ -176,6 +177,8 @@ export default function WelcomePage() {
           <Button size="lg">התחילו לנתח את הידיים שלכם — בחינם</Button>
         </Link>
       </section>
+
+      <AdSlot />
 
       <footer className="border-t border-base-border">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-2 px-4 py-6 text-center text-xs text-base-muted">
