@@ -32,7 +32,7 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob:${adsenseEnabled ? " https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com" : ""}`,
   "font-src 'self' data:",
-  `connect-src 'self' https://*.supabase.co https://challenges.cloudflare.com${analyticsProvider === "posthog" ? ` ${posthogHost}` : ""}${adsenseEnabled ? " https://*.googlesyndication.com https://*.google.com https://*.doubleclick.net https://*.googleadservices.com https://adtrafficquality.google" : ""}`,
+  `connect-src 'self' https://*.supabase.co https://challenges.cloudflare.com${analyticsProvider === "posthog" ? ` ${posthogHost}` : ""}${adsenseEnabled ? " https://*.googlesyndication.com https://*.google.com https://*.doubleclick.net https://*.googleadservices.com https://*.adtrafficquality.google" : ""}`,
   `frame-src https://challenges.cloudflare.com${adsenseEnabled ? " https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://googleads.g.doubleclick.net https://*.adtrafficquality.google" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",
