@@ -28,9 +28,9 @@ const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.postho
 const adsenseEnabled = Boolean(process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID);
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${adsenseEnabled ? " https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://*.googletagservices.com" : ""}${isDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${adsenseEnabled ? " https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://*.googletagservices.com https://*.adtrafficquality.google" : ""}${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob:${adsenseEnabled ? " https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com" : ""}`,
+  `img-src 'self' data: blob:${adsenseEnabled ? " https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.adtrafficquality.google" : ""}`,
   "font-src 'self' data:",
   `connect-src 'self' https://*.supabase.co https://challenges.cloudflare.com${analyticsProvider === "posthog" ? ` ${posthogHost}` : ""}${adsenseEnabled ? " https://*.googlesyndication.com https://*.google.com https://*.doubleclick.net https://*.googleadservices.com https://*.adtrafficquality.google" : ""}`,
   `frame-src https://challenges.cloudflare.com${adsenseEnabled ? " https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://googleads.g.doubleclick.net https://*.adtrafficquality.google" : ""}`,
